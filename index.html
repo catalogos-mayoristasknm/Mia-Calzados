@@ -450,7 +450,7 @@ function quickChatBlocks(raw){
     const groups=[];
     for(const entry of entries){
       if(/^(?:<multimedia omitido>|multimedia omitido|imagen omitida)$/i.test(entry))continue;
-      if(groups.length && /^(?:[^\p{L}\d$]*(?:talles?|n[uú]meros?|numeraci[oó]n|colores?|color|precio|minorista|mayorista|por mayor|por menor|desde 3|\$)|[^\n:]{1,25}:\s*\d{2}\b)/iu.test(entry)){
+      if(groups.length && /^(?:[^\p{L}\d$]*(?:calces?|talles?|n[uú]meros?|numeraci[oó]n|colores?|color|precio|minorista|mayorista|por mayor|por menor|desde 3|\$)|[^\n:]{1,25}:\s*\d{2}\b)/iu.test(entry)){
         groups[groups.length-1]+='\n'+entry;
       }else groups.push(entry);
     }
@@ -466,17 +466,18 @@ function quickSplitIngress(text){
 }
 function quickParseBlock(text){
  const cleaned=quickClean(text).replace(/[*_]/g,'').replace(/[\p{Extended_Pictographic}\uFE0F\u200d]/gu,'');
- const lines=cleaned.split(/\n|\s*[|;]\s*|\s*[,/]?\s+(?=(?:precio\s+)?(?:minorista|mayorista|por mayor|por menor|x\s*3|desde\s+3|talles?|n[uú]meros?|colores?|color)\s*[:=$])/i)
+ const lines=cleaned.split(/\n|\s*[|;]\s*|\s*[,/]?\s+(?=(?:precio\s+)?(?:minorista|mayorista|por mayor|por menor|x\s*3|desde\s+3|calces?|talles?|n[uú]meros?|colores?|color)\s*[:=$])/i)
    .map(x=>x.trim().replace(/^[•:|\s]+|[|/\s]+$/g,'')).filter(Boolean);
+ let wholesale=0;
  let name='',price=0,price3='',sizes=[],colors=[],description=[],byColor=[];
  for(const rawLine of lines){const line=rawLine.replace(/^[*_-]+|[*_-]+$/g,'').trim();let m;
   const colorRow=line.match(/^(?:color\s*:\s*)?([\p{L}][\p{L} /-]{0,35}?)\s*[:–-]\s*(?:talles?\s*)?((?:\d{1,2}\b)[\d\s,/-]*(?:(?:al?|hasta|y)\s*\d{1,2}[\d\s,/-]*)*)$/iu);
-  if(colorRow&&!/^(?:talles?|n[uú]meros?|numeraci[oó]n|precio|modelo|art[ií]culo|cantidad|stock|mayorista|minorista)$/i.test(colorRow[1].trim())){
+  if(colorRow&&!/^(?:calces?|talles?|n[uú]meros?|numeraci[oó]n|precio|modelo|art[ií]culo|cantidad|stock|mayorista|minorista)$/i.test(colorRow[1].trim())){
     byColor.push(colorRow[1].trim()+': '+colorRow[2]);continue;
   }
   if(/^\s*(?:nuev[oa]s?\s+)?ingres[oaó]s?\b/i.test(line)){const val=line.replace(/^\s*(?:nuev[oa]s?\s+)?ingres[oaó]s?\b\s*[:\-–]?\s*/i,'').trim();if(val&&!name)name=val.replace(/^(?:modelo|producto)\s*:\s*/i,'');continue;}
-  if(/^(?:talles?|numeraci[oó]n|n[uú]meros?|sizes?)\b/i.test(line)){
-   const remainder=line.replace(/^(?:talles?|numeraci[oó]n|n[uú]meros?|sizes?)\s*(?:del?|desde)?\s*[:=\-]?\s*/i,'').trim();
+  if(/^(?:calces?|talles?|numeraci[oó]n|n[uú]meros?|sizes?)\b/i.test(line)){
+   const remainder=line.replace(/^(?:calces?|talles?|numeraci[oó]n|n[uú]meros?|sizes?)\s*(?:del?|desde)?\s*[:=\-]?\s*/i,'').trim();
    sizes.push(...quickSizes(remainder.replace(/^del?\s+/i,'')));continue;
   }
   if((m=line.match(/^(?:colores|color|disponible en colores?)\s*[:=\-]?\s*(.*)$/i))){colors.push(...quickList(m[1]));continue;}
@@ -497,7 +498,8 @@ function quickParseBlock(text){
     if(!pm)continue;
     const n=quickNumber(pm[1])*(pm[2]?1000:1);
     if(n<=0)continue;
-    if(/mayorista|por mayor|(?:desde|por|x|partir de)\s*(?:3|tres)\b|(?:3|tres)\s*(?:pares|unidades|o m[aá]s)/i.test(part))price3=n;
+    if(/(?:desde|por|x|(?:a\s*)?partir\s+de)\s*(?:3|tres)\b|(?:3|tres)\s*(?:pares|unidades|o m[aá]s)/i.test(part))price3=n;
+    else if(/\b(?:mayorista|(?:por|x)\s+mayor)\b/i.test(part))wholesale=n;
     else if(!price)price=n;
     parsed=true;
    }
@@ -505,6 +507,11 @@ function quickParseBlock(text){
   }
   if(!name&&!/\b(?:consultas?|env[ií]os?|whatsapp|www|http|\d{6,}|solo por hoy)\b/i.test(line)){name=line.replace(/^[+*\- ]+|[+*\- ]+$/g,'').trim();continue;}
   if(!/^<\s*(?:archivo adjunto|multimedia omitido)/i.test(line))description.push(line);
+ }
+ // Si hay dos escalas, el importe sin umbral es la base y el de tres es el especial.
+ if(wholesale){
+  if(price3 && !price)price=wholesale;
+  else if(!price3)price3=wholesale;
  }
  name=name.replace(/[!¡*]+/g,' ').replace(/\s+/g,' ').trim();
  const full=(name+' '+text).toLowerCase();
