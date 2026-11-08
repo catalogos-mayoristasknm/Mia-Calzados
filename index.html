@@ -180,6 +180,23 @@ main.wrap { padding-top:0; }
  .catalog-filters { gap:5px; }
  .catalog-filters .filter-chip { padding:8px 12px; }
 }
+
+.product-grid>.card { display:flex; flex-direction:column; }
+.pair-open { margin-top:auto; width:100%; padding:12px 6px; background:#aa0950; font-weight:700; }
+.pair-cover { padding:0; width:100%; background:#f6e9e8; color:#654251; overflow:hidden; }
+.pair-cover img,.pair-cover span { display:block; width:100%; height:clamp(120px,35vw,205px); object-fit:contain; }
+.pair-cover span { display:grid; place-items:center; font-size:40px; }
+#pairPicker { box-sizing:border-box; width:min(450px,100%); max-width:100%; max-height:90dvh; padding:18px; border:0; border-radius:18px; background:#fffaf4; color:#391321; overflow:auto; }
+#pairPicker::backdrop { background:#200714ac; }
+body:has(#pairPicker[open]) { overflow:hidden; }
+.pair-top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.pair-top h2 { margin:0; font:500 26px Georgia,serif; overflow-wrap:anywhere; }
+.pair-top button { flex:none; }
+#pairPhoto:not([hidden]) { width:100%; height:clamp(90px,20dvh,180px); object-fit:contain; display:block; margin-top:12px; }
+#pairPicker select, #pairQty { width:100%; min-height:44px; }
+#pairHint:not(:empty) { background:#f8e8eb; color:#701538; padding:10px; border-radius:8px; font-weight:600; }
+#pairPicker .pricelevels { display:flex; flex-wrap:wrap; gap:16px; }
+@media(max-width:600px){#pairPicker { margin:auto auto 0; border-radius:18px 18px 0 0; padding-bottom:max(18px,env(safe-area-inset-bottom)); }}
 </style><script>
 // La navegación funciona independientemente de la conexión con Supabase.
 function cambiarSeccion(id){
@@ -262,7 +279,22 @@ document.addEventListener('keydown',event=>{
 <div class="catalog-toolbar"><div><h2>Explorá los modelos <span class="product-counter" id="productCount"></span></h2></div><label class="sort-group">Ordenar <select id="sort" onchange="renderProducts()"><option value="recent">Novedades primero</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option><option value="az">Nombre A–Z</option></select></label></div>
  <div class="shop-description">Podés combinar talles y colores del mismo modelo para alcanzar el precio desde 3 pares.</div>
  <div id="products" class="grid product-grid"></div>
-</section><section id="cart" class="cart-overlay hidden" role="dialog" aria-modal="true" aria-label="Mi pedido">
+</section><dialog id="pairPicker" aria-labelledby="pairName">
+  <div class="pair-top"><h2 id="pairName"></h2><button type="button" class="drawer-close" aria-label="Cerrar ficha" onclick="document.getElementById('pairPicker').close()">×</button></div>
+  <form id="pairForm">
+    <img id="pairPhoto" alt="">
+    <p id="pairDescription" class="muted"></p>
+    <div id="pairPrices"></div>
+    <div id="pairVariants">
+      <label for="pairSize">Talle</label><select id="pairSize" onchange="updatePairColors()"></select>
+      <label for="pairColor">Color</label><select id="pairColor"></select>
+    </div>
+    <p id="pairConsult" class="muted">Consultá talle y color por WhatsApp al enviar tu pedido.</p>
+    <label for="pairQty">Cantidad de pares</label><input id="pairQty" type="number" min="1" step="1" required inputmode="numeric" oninput="updatePairHint()">
+    <p id="pairHint" role="status"></p>
+    <button class="checkout">Agregar al pedido</button>
+  </form>
+</dialog><section id="cart" class="cart-overlay hidden" role="dialog" aria-modal="true" aria-label="Mi pedido">
  <button class="cart-scrim" type="button" onclick="cambiarSeccion('shop')" aria-label="Cerrar carrito"></button>
  <aside class="cart-drawer"><div class="drawer-head"><div><span class="eyebrow">TU SELECCIÓN</span><h2>🛍 Mi pedido</h2></div><button class="drawer-close" type="button" onclick="cambiarSeccion('shop')" aria-label="Cerrar">×</button></div>
  <p class="drawer-note">Elegí las cantidades y envianos tu consulta. No se cobra desde esta página.</p>
@@ -319,24 +351,69 @@ let products=[],variants=[],cart=[],isAdmin=false;const el=id=>document.getEleme
  if(el('productCount'))el('productCount').textContent=`(${found.length})`;
 
  el('products').innerHTML=found.length?found.map(p=>{
-  let vs=variants.filter(v=>v.product_id===p.id);
-  const promo=Number(p.price_from_3)>0;
-  const pricing=`<div class="pricelevels"><div class="unitprice">${fmt(p.price)} <small>El par</small></div>${promo?`<div class="bulkprice">${fmt(p.price_from_3)} <small>Por par desde 3 del mismo modelo</small></div>`:''}</div>`;
-  return `<article class="card">${p.image_url?`<img src="${esc(p.image_url)}" alt="${esc(p.name)}" loading="lazy" onclick="openProductPhoto('${p.id}')" title="Ver foto ampliada" onerror="this.style.display='none'">`:'<div style="height:160px;display:grid;place-items:center;background:#f5e5ed;border-radius:10px;font-size:55px">👟</div>'}<h3>${esc(p.name)}</h3><p class="muted">${esc(p.description)}</p>${pricing}<p class="muted">${esc(p.audience)} · ${vs.length?'Elegí talle y color':'Talle y color a consultar'}</p><select id="v-${p.id}" style="width:100%">${vs.length?vs.map(v=>`<option value="${v.id}">${esc(v.size)} · ${esc(v.color)}</option>`).join(''):'<option value="consultar">Talle y color a consultar</option>'}</select><div class="line" style="margin-top:8px"><input id="q-${p.id}" type="number" min="1" value="1" aria-label="Cantidad"><button onclick="add('${p.id}')">Agregar</button></div></article>`;
+  return `<article class="card"><button class="pair-cover" type="button" data-pair="${esc(p.id)}" aria-label="Elegir ${esc(p.name)}">${p.image_url?`<img src="${esc(p.image_url)}" alt="" loading="lazy">`:'<span aria-hidden="true">👟</span>'}</button><h3>${esc(p.name)}</h3>${pairPrices(p)}<button class="pair-open" type="button" data-pair="${esc(p.id)}">Elegir mi par</button></article>`;
  }).join(''):'<p>No hay productos disponibles todavía.</p>';
 }
-function add(pid){
- const p=products.find(x=>x.id===pid);
- const selected=el('v-'+pid)?.value;
- const v=selected==='consultar'?{id:pid+'-consultar',size:'A consultar',color:'A consultar'}:variants.find(x=>x.id===selected);
- const n=Number(el('q-'+pid)?.value);
- if(!p||!v||!Number.isInteger(n)||n<1)return msg('Ingresá una cantidad válida');
+
+function pairPrices(p){
+ const bulk=Number(p.price_from_3)>0 ? `<div class="bulkprice">${fmt(p.price_from_3)}<small>Por par desde 3 del mismo modelo</small></div>` : '';
+ return `<div class="pricelevels"><div class="unitprice">${fmt(p.price)}<small>El par</small></div>${bulk}</div>`;
+}
+let currentPair=null;
+function pairOptions(){
+ return variants.filter(v=>v.product_id===currentPair.id);
+}
+el('products').addEventListener('click',event=>{
+ const button=event.target.closest('[data-pair]');
+ if(!button)return;
+ currentPair=products.find(p=>String(p.id)===button.dataset.pair);
+ if(!currentPair)return;
+ el('pairName').textContent=currentPair.name;
+ el('pairDescription').textContent=currentPair.description||'';
+ el('pairPrices').innerHTML=pairPrices(currentPair);
+ const photo=el('pairPhoto');
+ photo.hidden=!currentPair.image_url;
+ if(currentPair.image_url){photo.src=currentPair.image_url;photo.alt=currentPair.name}else{photo.removeAttribute('src')}
+ const sizes=[...new Set(pairOptions().map(v=>v.size))];
+ el('pairVariants').hidden=!sizes.length;
+ el('pairConsult').hidden=!!sizes.length;
+ el('pairSize').replaceChildren(...sizes.map(size=>new Option(size,size)));
+ updatePairColors();
+ el('pairQty').value=1;
+ updatePairHint();
+ el('pairPicker').showModal();
+ el('pairPicker').scrollTop=0;
+});
+function updatePairColors(){
+ const matches=pairOptions().filter(v=>String(v.size)===el('pairSize').value);
+ el('pairColor').replaceChildren(...matches.map(v=>new Option(v.color,v.id)));
+}
+function updatePairHint(){
+ const existing=cartModelQty(currentPair.id);
+ const qty=el('pairQty').valueAsNumber;
+ const promo=Number(currentPair.price_from_3);
+ let hint='';
+ if(promo>0 && Number.isSafeInteger(qty) && qty>0){
+  if(existing===2 && qty===1)hint=`Sumá 1 par más de este modelo y cada par te queda en ${fmt(promo)}.`;
+  else if(existing+qty===2)hint=`Con un par más de este modelo, cada par te queda en ${fmt(promo)}.`;
+  else if(existing+qty>=3)hint=`Al agregar esta cantidad, los ${existing+qty} pares del modelo quedan a ${fmt(promo)} cada uno.`;
+ }
+ el('pairHint').textContent=hint;
+}
+el('pairForm').addEventListener('submit',event=>{
+ event.preventDefault();
+ const p=currentPair;
+ const options=pairOptions();
+ const v=options.length ? options.find(v=>String(v.id)===el('pairColor').value) : {id:p.id+'-consultar',size:'A consultar',color:'A consultar'};
+ const n=el('pairQty').valueAsNumber;
+ if(!v||!Number.isSafeInteger(n)||n<1)return;
  const item=cart.find(x=>x.variant===v.id);
  if(item)item.qty+=n;
  else cart.push({variant:v.id,product:p.id,name:p.name,size:v.size,color:v.color,price:Number(p.price),qty:n});
  el('count').textContent=`(${cart.reduce((sum,x)=>sum+x.qty,0)})`;
- msg('Producto agregado al pedido');
-}// Precios desde 3 unidades por MODELO, sumando talles y colores de ese modelo.
+ el('pairPicker').close();
+ msg(cartModelQty(p.id)===2 && Number(p.price_from_3)>0 ? `Sumá 1 par más de este modelo y cada par te queda en ${fmt(p.price_from_3)}.` : 'Producto agregado al pedido');
+});// Precios desde 3 unidades por MODELO, sumando talles y colores de ese modelo.
 function cartModelQty(productId){return cart.filter(x=>x.product===productId).reduce((n,x)=>n+x.qty,0)}
 function cartUnitPrice(item){
  const p=products.find(x=>x.id===item.product);
