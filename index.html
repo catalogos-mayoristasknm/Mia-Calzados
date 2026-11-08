@@ -234,7 +234,7 @@ main.wrap { padding-top:0; }
  *,*::before,*::after {animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}
 }
 .pair-cover .no-photo {font:italic 17px Georgia,serif;color:#765360;}
-</style><script>
+.variant-search{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:12px 0}.variant-search label{flex:1;margin:0;min-width:88px;max-width:170px}.variant-search select{display:block;width:100%;margin-top:3px;min-height:44px;color:#41172d}.variant-search button,.qty-adjust button{min-height:44px}.qty-adjust{display:flex;align-items:center;gap:6px;margin-top:5px}.qty-adjust button{min-width:44px;background:#f3e5ea;color:#621738;font-weight:700}.qty-adjust output{min-width:22px;text-align:center}.cart-drawer>*{flex-shrink:0}</style><script>
 // La navegación funciona independientemente de la conexión con Supabase.
 function cambiarSeccion(id){
   const cart=document.getElementById('cart');
@@ -313,7 +313,7 @@ document.addEventListener('keydown',event=>{
    <button type="button" class="filter-chip" data-audience="Caballero" onclick="setAudience('Caballero')">Hombre</button>
    <button type="button" class="filter-chip" data-audience="Niños" onclick="setAudience('Niños')">Infantil</button>
   </div>
-<div class="catalog-toolbar"><div><h2>Explorá los modelos <span class="product-counter" id="productCount" aria-live="polite"></span></h2></div><label class="sort-group">Ordenar <select id="sort" onchange="renderProducts()"><option value="recent">Novedades primero</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option><option value="az">Nombre A–Z</option></select></label></div>
+<div class="variant-search"><label>Número<select id="catalogSize" onchange="renderProducts()"><option value="">Todos</option></select></label><label>Color<select id="catalogColor" onchange="renderProducts()"><option value="">Todos</option></select></label><button type="button" id="resetVariants" hidden>Quitar filtros</button></div><div class="catalog-toolbar"><div><h2>Explorá los modelos <span class="product-counter" id="productCount" aria-live="polite"></span></h2></div><label class="sort-group">Ordenar <select id="sort" onchange="renderProducts()"><option value="recent">Novedades primero</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option><option value="az">Nombre A–Z</option></select></label></div>
  <div class="shop-description">Desde 3 pares surtidos, cada modelo lleva su precio mayorista. Combiná modelos, colores y números.</div>
  <div id="products" class="grid product-grid"><p id="catalogLoad" role="status">Cargando modelos…</p></div><button type="button" class="more-models" id="moreModels" hidden>Ver más modelos</button>
 </section><section id="cart" class="cart-overlay hidden" role="dialog" aria-modal="true" aria-label="Mi pedido">
@@ -363,6 +363,25 @@ const SUPABASE_URL='https://keirzwfqlineridpubhn.supabase.co',KEY='sb_publishabl
 let products=[],variants=[],cart=[],isAdmin=false;const el=id=>document.getElementById(id),peso=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}),fmt=n=>peso.format(n||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function msg(s){if(el('catalogLoad'))el('catalogLoad').remove();el('notice').textContent=s;const n=el('adminNotice');if(n)n.textContent=s}function show(id){cambiarSeccion(id)}async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu conexión y actualizá la página.');return}let [p,v]=await Promise.all([sb.from('mia_products').select('*').order('sort_order'),sb.from('mia_variants').select('*')]);if(p.error||v.error){msg('Error al cargar: '+(p.error||v.error).message);return}products=p.data||[];variants=v.data||[];renderProducts();updateBar();if(isAdmin)renderAdmin()}function renderProducts(){
  let q=el('search').value.toLowerCase(),a=el('audience').value;
  let found=products.filter(p=>p.active&&(!a||p.audience===a||p.audience==='Todos')&&[p.name,p.description,p.category].join(' ').toLowerCase().includes(q));
+ const byProduct=new Map();
+ for(const v of variants){
+   if(!byProduct.has(v.product_id))byProduct.set(v.product_id,[]);
+   byProduct.get(v.product_id).push(v);
+ }
+
+ const activeIds=new Set(found.map(p=>p.id));
+ const eligible=variants.filter(v=>activeIds.has(v.product_id));
+ function fillFilter(id,values){
+  const select=el(id),previous=select.value;
+  const choices=[...new Set(values.filter(v=>v&&v.toLowerCase()!=='a consultar'))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  select.replaceChildren(new Option('Todos',''),...choices.map(v=>new Option(v,v)));
+  if(choices.includes(previous))select.value=previous;
+  return select.value;
+ }
+ const size=fillFilter('catalogSize',eligible.map(v=>String(v.size||'')));
+ const color=fillFilter('catalogColor',eligible.filter(v=>!size||String(v.size)===size).map(v=>v.color));
+ el('resetVariants').hidden=!size&&!color;
+ if(size||color)found=found.filter(p=>(byProduct.get(p.id)||[]).some(v=>(!size||String(v.size)===size)&&(!color||v.color===color)));
  const sort=el('sort')?.value||'recent';
  if(sort==='asc')found.sort((x,y)=>Number(x.price)-Number(y.price));
  else if(sort==='desc')found.sort((x,y)=>Number(y.price)-Number(x.price));
@@ -370,11 +389,6 @@ let products=[],variants=[],cart=[],isAdmin=false;const el=id=>document.getEleme
  else found.sort((x,y)=>Date.parse(y.created_at||0)-Date.parse(x.created_at||0));
  if(el('productCount'))el('productCount').textContent=`(${found.length})`;
 
- const byProduct=new Map();
- for(const v of variants){
-   if(!byProduct.has(v.product_id))byProduct.set(v.product_id,[]);
-   byProduct.get(v.product_id).push(v);
- }
  let shown=0;
  const grid=el('products'),more=el('moreModels');
  function appendPage(){
@@ -400,6 +414,7 @@ function pairPrices(p){
  const bulk=Number(p.price_from_3)>0 ? `<div class="bulkprice">${fmt(p.price_from_3)}<small>Mayorista · desde 3 pares surtidos</small></div>` : '';
  return `<div class="pricelevels"><div class="unitprice">${fmt(p.price)}<small>El par</small></div>${bulk}</div>`;
 }
+el('resetVariants').onclick=()=>{el('catalogSize').value='';el('catalogColor').value='';renderProducts()};
 const productGrid=el('products');
 productGrid.addEventListener('click',event=>{
  const photo=event.target.closest('[data-photo]');
@@ -459,9 +474,18 @@ function updateBar(){
 function renderCart(){
  updateBar();
  document.querySelectorAll('.choice-note').forEach(note=>note.textContent='');
- el('cartItems').innerHTML=cart.length?cart.map((x,i)=>`<div class="row"><div><strong>${esc(x.name)}</strong><div class="muted">${esc(x.size)} · ${esc(x.color)} · ${x.qty} × ${fmt(cartUnitPrice(x))}</div>${cartHasPromo(x)?'<div class="discounttag">✓ Precio mayorista aplicado</div>':''}</div><button class="danger" onclick="cart.splice(${i},1);el('count').textContent='('+cart.reduce((s,x)=>s+x.qty,0)+')';renderCart()">Quitar</button></div>`).join(''):'Todavía no agregaste productos';
+ el('cartItems').innerHTML=cart.length?cart.map((x,i)=>`<div class="row"><div><strong>${esc(x.name)}</strong><div class="muted">${esc(x.size)} · ${esc(x.color)} · ${x.qty} × ${fmt(cartUnitPrice(x))}</div>${cartHasPromo(x)?'<div class="discounttag">✓ Precio mayorista aplicado</div>':''}<div class="qty-adjust"><button type="button" aria-label="Restar un par" data-delta="-1" data-index="${i}" ${x.qty<=1?'disabled':''}>−</button><output>${x.qty}</output><button type="button" aria-label="Sumar un par" data-delta="1" data-index="${i}">+</button></div></div><button class="danger" onclick="cart.splice(${i},1);el('count').textContent='('+cart.reduce((s,x)=>s+x.qty,0)+')';renderCart()">Quitar</button></div>`).join(''):'Todavía no agregaste productos';
  el('total').textContent='Total estimado: '+fmt(cartTotal());
 }
+el('cartItems').addEventListener('click',event=>{
+ const button=event.target.closest('[data-delta]');if(!button)return;
+ const index=Number(button.dataset.index),item=cart[index];
+ if(!item)return;
+ item.qty=Math.max(1,item.qty+Number(button.dataset.delta));
+ el('count').textContent='('+cartQty()+')'; renderCart();
+ const next=el('cartItems').querySelector('[data-index="'+index+'"][data-delta="'+button.dataset.delta+'"]:not(:disabled)')||el('cartItems').querySelector('[data-index="'+index+'"][data-delta="1"]');
+ next?.focus();
+});
 function sendWhatsApp(){
  if(!cart.length)return msg('Agregá productos primero');
  const name=el('customer').value.trim();if(!name)return msg('Ingresá tu nombre');
