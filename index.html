@@ -345,7 +345,7 @@ document.addEventListener('keydown',event=>{
  </div></div>
  <div class="admin-pane active" data-pane="productos"><div class="admin-sectionheading"><div><span class="eyebrow">TU CATÁLOGO</span><h2>Productos guardados</h2></div><button type="button" onclick="setAdminTab('agregar')">＋ Nuevo producto</button></div>
  <div class="panel"><input id="adminSearch" class="admin-search" type="search" placeholder="🔎 Buscar un producto…" oninput="renderAdmin()"><div id="adminProducts"></div></div></div>
- <div class="admin-pane" data-pane="agregar"><div class="admin-sectionheading"><div><span class="eyebrow">GESTIÓN DE PRODUCTOS</span><h2>Agregar o editar</h2></div></div><div class="panel"><h3 id="formTitle">Nuevo producto</h3><input type="hidden" id="pid"><label>Nombre del modelo</label><input id="pname" style="width:100%" placeholder="Ej.: Zapatilla urbana"><div class="line"><div><label>Precio por unidad (ARS)</label><input id="pprice" type="number" min="0" step="0.01" style="width:100%" required></div><div><label>Precio mayorista por par desde 3 surtidos (ARS)</label><input id="pprice3" type="number" min="0" step="0.01" style="width:100%" placeholder="Opcional"></div><div><label>Público</label><select id="paudience" style="width:100%"><option>Todos</option><option>Dama</option><option>Caballero</option><option>Niños</option></select></div></div><label>Categoría</label><input id="pcategory" value="Calzados" style="width:100%"><label>Descripción</label><textarea id="pdesc" style="width:100%"></textarea><label>URL pública de imagen (https://...)</label><input id="pimage" style="width:100%"><label><input type="checkbox" id="pactive" checked> Visible en el catálogo</label><p><button onclick="saveProduct()">Guardar producto</button> <button class="light" onclick="clearForm()">Limpiar</button></p></div></div>
+ <div class="admin-pane" data-pane="agregar"><div class="admin-sectionheading"><div><span class="eyebrow">GESTIÓN DE PRODUCTOS</span><h2>Agregar o editar</h2></div></div><div class="panel"><h3 id="formTitle">Nuevo producto</h3><input type="hidden" id="pid"><label>Nombre del modelo</label><input id="pname" style="width:100%" placeholder="Ej.: Zapatilla urbana"><div class="line"><div><label>Precio por unidad (ARS)</label><input id="pprice" type="number" min="0" step="0.01" style="width:100%" required></div><div><label>Precio mayorista por par desde 3 surtidos (ARS)</label><input id="pprice3" type="number" min="0" step="0.01" style="width:100%" placeholder="Opcional"></div><div><label for="pdozen">Precio total por docena del modelo ($)</label><input id="pdozen" type="number" min="0.01" step="0.01" placeholder="Opcional"></div><div><label>Público</label><select id="paudience" style="width:100%"><option>Todos</option><option>Dama</option><option>Caballero</option><option>Niños</option></select></div></div><label>Categoría</label><input id="pcategory" value="Calzados" style="width:100%"><label>Descripción</label><textarea id="pdesc" style="width:100%"></textarea><label>URL pública de imagen (https://...)</label><input id="pimage" style="width:100%"><label><input type="checkbox" id="pactive" checked> Visible en el catálogo</label><p><button onclick="saveProduct()">Guardar producto</button> <button class="light" onclick="clearForm()">Limpiar</button></p></div></div>
  <div class="admin-pane" data-pane="rapida"><div class="admin-sectionheading"><div><span class="eyebrow">DESDE WHATSAPP</span><h2>Carga rápida</h2></div></div><div class="panel quickbox" id="quickContainer">
 <div class="quickhead"><div><h3>⚡ Carga rápida desde WhatsApp</h3><p class="quick-hint">Pegá mensajes de ingresos o importá un chat .txt. Después revisá cada calzado, sus talles, colores y fotos antes de guardar.</p></div><button type="button" onclick="toggleQuickImport()" id="quickToggle">Abrir carga rápida</button></div>
 <div id="quickBody" class="hidden">
@@ -450,9 +450,12 @@ async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu co
  if(!found.length)grid.textContent=q||a?'No encontramos modelos con esa búsqueda.':'No hay productos disponibles todavía.';
 }
 
+function validDozen(value,unit){
+ return value==null || value==='' || (Number.isFinite(Number(value)) && Number(value)>0 && Math.round(Number(value)*100)<=12*Math.round(Number(unit)*100));
+}
 function pairPrices(p){
  const bulk=Number(p.price_from_3)>0 ? `<div class="bulkprice">${fmt(p.price_from_3)}<small>Mayorista · desde 3 pares surtidos</small></div>` : '';
- return `<div class="pricelevels"><div class="unitprice">${fmt(p.price)}<small>El par</small></div>${bulk}</div>`;
+ return `<div class="pricelevels"><div class="unitprice">${fmt(p.price)}<small>El par</small></div>${bulk}${Number(p.price_dozen)>0?`<div class="bulkprice">${fmt(p.price_dozen)}<small>La docena · 12 pares del mismo modelo</small></div>`:''}</div>`;
 }
 el('resetVariants').onclick=()=>{el('catalogSize').value='';el('catalogColor').value='';renderProducts()};
 const productGrid=el('products');
@@ -470,7 +473,7 @@ async function shareModel(id){
  const sizes=[...new Set(variants.filter(v=>v.product_id===p.id && v.size && v.size!=='A consultar').map(v=>String(v.size)))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
  const consecutive=sizes.length>2 && sizes.every((s,i)=>/^\d+$/.test(s) && (!i || Number(s)===Number(sizes[i-1])+1));
  const range=consecutive?sizes[0]+' al '+sizes.at(-1):sizes.join(', ');
- const text=[p.name+(range?' · Números '+range:''),fmt(p.price)+' el par'+(Number(p.price_from_3)>0?' · '+fmt(p.price_from_3)+' el par desde 3 pares surtidos':''),'Elegí tu número y armá tu pedido 👇'].join('\n');
+ const text=[p.name+(range?' · Números '+range:''),fmt(p.price)+' el par'+(Number(p.price_from_3)>0?' · '+fmt(p.price_from_3)+' el par desde 3 pares surtidos':'')+(Number(p.price_dozen)>0?' · '+fmt(p.price_dozen)+' la docena del mismo modelo':''),'Elegí tu número y armá tu pedido 👇'].join('\n');
  if(p.image_url){
   let source;
   try{source=new URL(p.image_url,location.href)}catch{}
@@ -622,14 +625,33 @@ function cartUnitPrice(item){
  return cartQty()>=3 && promo>0 ? promo : Number(p.price)||0;
 }
 function cartHasPromo(item){const p=products.find(x=>x.id===item.product);return cartQty()>=3&&Number(p?.price_from_3)>0}
-function cartTotal(){return cart.reduce((sum,x)=>sum+x.qty*cartUnitPrice(x),0)}
+function modelCharges(){
+ const groups=new Map();
+ for(const item of cart){
+  const group=groups.get(item.product)||{item,qty:0};
+  group.qty+=item.qty;
+  groups.set(item.product,group);
+ }
+ for(const group of groups.values()){
+  const model=products.find(p=>p.id===group.item.product);
+  const dozen=Number(model?.price_dozen)||0;
+  const unit=cartUnitPrice(group.item);
+  const bundles=dozen>0 && dozen<=unit*12 ? Math.floor(group.qty/12) : 0;
+  const singles=group.qty-bundles*12;
+  group.total=(bundles*Math.round(dozen*100)+singles*Math.round(unit*100))/100;
+  group.detail=bundles ? bundles+' × docena de '+fmt(dozen)+(singles?' + '+singles+' × '+fmt(unit):'')+' = '+fmt(group.total) : '';
+ }
+ return groups;
+}
+function cartTotal(){return Array.from(modelCharges().values()).reduce((sum,g)=>sum+g.total,0)}
 function updateBar(){
  el('barTotal').textContent=cart.length?fmt(cartTotal()):'';
 }
 function renderCart(){
  updateBar();
  document.querySelectorAll('.choice-note').forEach(note=>note.textContent='');
- el('cartItems').innerHTML=cart.length?cart.map((x,i)=>`<div class="row"><div><strong>${esc(x.name)}</strong><div class="muted">${esc(x.size)} · ${esc(x.color)} · ${x.qty} × ${fmt(cartUnitPrice(x))}</div>${cartHasPromo(x)?'<div class="discounttag">✓ Precio mayorista aplicado</div>':''}<div class="qty-adjust"><button type="button" aria-label="Restar un par" data-delta="-1" data-index="${i}" ${x.qty<=1?'disabled':''}>−</button><output>${x.qty}</output><button type="button" aria-label="Sumar un par" data-delta="1" data-index="${i}">+</button></div></div><button class="danger" onclick="cart.splice(${i},1);persistOrder();el('count').textContent='('+cart.reduce((s,x)=>s+x.qty,0)+')';renderCart()">Quitar</button></div>`).join(''):'Todavía no agregaste productos';
+ const charges=modelCharges();
+ el('cartItems').innerHTML=cart.length?cart.map((x,i)=>`<div class="row"><div><strong>${esc(x.name)}</strong><div class="muted">${esc(x.size)} · ${esc(x.color)} · ${x.qty} ${charges.get(x.product).detail?"par(es)":"× "+fmt(cartUnitPrice(x))}</div>${charges.get(x.product).detail?(charges.get(x.product).item===x?'<div class="discounttag">Total del modelo · '+charges.get(x.product).detail+'</div>':''):cartHasPromo(x)?'<div class="discounttag">✓ Precio mayorista aplicado</div>':''}<div class="qty-adjust"><button type="button" aria-label="Restar un par" data-delta="-1" data-index="${i}" ${x.qty<=1?'disabled':''}>−</button><output>${x.qty}</output><button type="button" aria-label="Sumar un par" data-delta="1" data-index="${i}">+</button></div></div><button class="danger" onclick="cart.splice(${i},1);persistOrder();el('count').textContent='('+cart.reduce((s,x)=>s+x.qty,0)+')';renderCart()">Quitar</button></div>`).join(''):'Todavía no agregaste productos';
  el('total').textContent='Total estimado: '+fmt(cartTotal());
 }
 el('cartItems').addEventListener('click',event=>{
@@ -645,27 +667,31 @@ el('cartItems').addEventListener('click',event=>{
 function sendWhatsApp(){
  if(!cart.length)return msg('Agregá productos primero');
  const name=el('customer').value.trim();if(!name)return msg('Ingresá tu nombre');
+ const charges=modelCharges();
  const t=['Hola, quiero consultar disponibilidad de este pedido en Mayorista Mia Calzados:',
   'Cliente: '+name,el('phone').value.trim()?'Teléfono: '+el('phone').value.trim():'',
-  ...cart.map(x=>`• ${x.name} / Talle ${x.size} / ${x.color} / ${x.qty} u. × ${fmt(cartUnitPrice(x))} = ${fmt(x.qty*cartUnitPrice(x))}${cartHasPromo(x)?' (mayorista)':''}`),
+  ...cart.map(x=>`• ${x.name} / Talle ${x.size} / ${x.color} / ${x.qty} u.${charges.get(x.product).detail?'':' × '+fmt(cartUnitPrice(x))+' = '+fmt(x.qty*cartUnitPrice(x))+(cartHasPromo(x)?' (mayorista)':'')}`),
+  ...Array.from(charges.values()).filter(g=>g.detail).map(g=>g.item.name+' · '+g.detail),
   'Total estimado: '+fmt(cartTotal()),
   el('notes').value.trim()?'Notas: '+el('notes').value.trim():'',
   'Quedo a la espera de confirmación de disponibilidad y precio.'].filter(Boolean).join('\n');
  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(t),'_blank','noopener');
 }
-async function refreshAdmin(){if(!sb){el('login').classList.remove('hidden');el('adminArea').classList.add('hidden');msg('No se pudo conectar a Supabase. Revisá tu conexión y actualizá la página.');return}let {data:{user}}=await sb.auth.getUser();isAdmin=false;if(user){let r=await sb.from('mia_admins').select('user_id').eq('user_id',user.id).maybeSingle();isAdmin=!!r.data}el('login').classList.toggle('hidden',isAdmin);el('adminArea').classList.toggle('hidden',!isAdmin);if(isAdmin){await load();renderAdmin()}}async function login(){if(!sb)return msg('Supabase no está disponible. Recargá la página.');let {error}=await sb.auth.signInWithPassword({email:el('email').value.trim(),password:el('password').value});if(error)return msg('No se pudo ingresar: '+error.message);el('password').value='';await refreshAdmin();if(!isAdmin)msg('Tu cuenta existe, pero no está habilitada en mia_admins')}async function logout(){if(!sb)return;await sb.auth.signOut();isAdmin=false;await refreshAdmin();msg('Sesión cerrada')}function clearForm(){for(const id of ['pid','pname','pprice','pprice3','pdesc','pimage'])el(id).value='';el('pcategory').value='Calzados';el('paudience').value='Todos';el('pactive').checked=true;el('formTitle').textContent='Nuevo producto'}async function saveProduct(){
+async function refreshAdmin(){if(!sb){el('login').classList.remove('hidden');el('adminArea').classList.add('hidden');msg('No se pudo conectar a Supabase. Revisá tu conexión y actualizá la página.');return}let {data:{user}}=await sb.auth.getUser();isAdmin=false;if(user){let r=await sb.from('mia_admins').select('user_id').eq('user_id',user.id).maybeSingle();isAdmin=!!r.data}el('login').classList.toggle('hidden',isAdmin);el('adminArea').classList.toggle('hidden',!isAdmin);if(isAdmin){await load();renderAdmin()}}async function login(){if(!sb)return msg('Supabase no está disponible. Recargá la página.');let {error}=await sb.auth.signInWithPassword({email:el('email').value.trim(),password:el('password').value});if(error)return msg('No se pudo ingresar: '+error.message);el('password').value='';await refreshAdmin();if(!isAdmin)msg('Tu cuenta existe, pero no está habilitada en mia_admins')}async function logout(){if(!sb)return;await sb.auth.signOut();isAdmin=false;await refreshAdmin();msg('Sesión cerrada')}function clearForm(){for(const id of ['pid','pname','pprice','pprice3','pdozen','pdesc','pimage'])el(id).value='';el('pcategory').value='Calzados';el('paudience').value='Todos';el('pactive').checked=true;el('formTitle').textContent='Nuevo producto'}async function saveProduct(){
  if(!isAdmin)return;
  const name=el('pname').value.trim(),price=Number(el('pprice').value),raw3=el('pprice3').value.trim(),price3=raw3===''?null:Number(raw3);
  if(!name||!Number.isFinite(price)||price<=0)return msg('Completá nombre y precio por unidad válido');
  if(price3!==null&&(!Number.isFinite(price3)||price3<=0||price3>price))return msg('El precio desde 3 debe ser mayor que cero y no superar el precio por unidad');
- const o={name,price,price_from_3:price3,category:el('pcategory').value.trim()||'Calzados',audience:el('paudience').value,description:el('pdesc').value.trim(),image_url:el('pimage').value.trim()||null,active:el('pactive').checked};
+ const dozen=el("pdozen").value.trim();
+ if(!validDozen(dozen,price3||price))return msg("Revisá el total de la docena: debe ser positivo y no superar el valor de 12 pares.");
+ const o={name,price,price_dozen:dozen ? Number(dozen) : null,price_from_3:price3,category:el('pcategory').value.trim()||'Calzados',audience:el('paudience').value,description:el('pdesc').value.trim(),image_url:el('pimage').value.trim()||null,active:el('pactive').checked};
  const id=el('pid').value;const r=id?await sb.from('mia_products').update(o).eq('id',id):await sb.from('mia_products').insert(o);
  if(r.error)return msg('Error al guardar: '+r.error.message+'. ¿Ejecutaste el SQL de precios?');
  clearForm();await load();msg('Producto y precios guardados');
 }
-function editProduct(id){let p=products.find(x=>x.id===id);if(!p)return;for(const [key,val] of Object.entries({pid:p.id,pname:p.name,pprice:p.price,pprice3:p.price_from_3??'',pcategory:p.category,paudience:p.audience,pdesc:p.description,pimage:p.image_url||''}))el(key).value=val;el('pactive').checked=p.active;el('formTitle').textContent='Editar producto';setAdminTab('agregar');el('formTitle').scrollIntoView({behavior:'smooth'})}function renderAdmin(){
+function editProduct(id){let p=products.find(x=>x.id===id);if(!p)return;for(const [key,val] of Object.entries({pid:p.id,pname:p.name,pprice:p.price,pprice3:p.price_from_3??'',pdozen:p.price_dozen??'',pcategory:p.category,paudience:p.audience,pdesc:p.description,pimage:p.image_url||''}))el(key).value=val;el('pactive').checked=p.active;el('formTitle').textContent='Editar producto';setAdminTab('agregar');el('formTitle').scrollIntoView({behavior:'smooth'})}function renderAdmin(){
  el('adminProducts').innerHTML=products.filter(p=>p.name.toLowerCase().includes((el('adminSearch')?.value||'').toLowerCase())).map(p=>`<div class="panel" style="margin:10px 0">
- <div class="row"><div><strong>${esc(p.name)}</strong><div class="muted">Unidad ${fmt(p.price)}${Number(p.price_from_3)>0?` · Desde 3 ${fmt(p.price_from_3)}`:''} · ${p.active?'Visible':'Oculto'}</div></div><button class="light" onclick="editProduct('${p.id}')">Editar</button></div>
+ <div class="row"><div><strong>${esc(p.name)}</strong><div class="muted">Unidad ${fmt(p.price)}${Number(p.price_from_3)>0?` · Desde 3 ${fmt(p.price_from_3)}`:''} ${Number(p.price_dozen)>0?' · Docena '+fmt(p.price_dozen):''} · ${p.active?'Visible':'Oculto'}</div></div><button class="light" onclick="editProduct('${p.id}')">Editar</button></div>
  <div id="vars-${p.id}">${variants.filter(v=>v.product_id===p.id).map(v=>`<div class="row"><span>Talle ${esc(v.size)} · Color ${esc(v.color)}</span></div>`).join('')||'<p class="muted">Todavía sin talles y colores. Los clientes podrán consultarlos por WhatsApp.</p>'}</div>
  <div class="line" style="margin-top:10px"><input id="size-${p.id}" placeholder="Talle (ej. 38)"><input id="color-${p.id}" placeholder="Color"><button onclick="addVariant('${p.id}')">Agregar talle/color</button></div>
  </div>`).join('')||'<p>No hay productos cargados.</p>';
@@ -717,11 +743,17 @@ function quickSplitIngress(text){
 }
 function quickParseBlock(text){
  const cleaned=quickClean(text).replace(/[*_]/g,'').replace(/[\p{Extended_Pictographic}\uFE0F\u200d]/gu,'');
- const lines=cleaned.split(/\n|\s*[|;]\s*|\s*[,/]?\s+(?=(?:precio\s+)?(?:minorista|mayorista|por mayor|por menor|x\s*3|desde\s+3|calces?|talles?|n[uú]meros?|colores?|color)\s*[:=$])/i)
+ const lines=cleaned.replace(/\s+((?:precio\s+)?(?:por\s+|la\s+|x\s*)?docena\s*[:=$])/gi,'\n$1').split(/\n|\s*[|;]\s*|\s*[,/]?\s+(?=(?:precio\s+)?(?:minorista|mayorista|por mayor|por menor|x\s*3|desde\s+3|calces?|talles?|n[uú]meros?|colores?|color)\s*[:=$])/i)
    .map(x=>x.trim().replace(/^[•:|\s]+|[|/\s]+$/g,'')).filter(Boolean);
  let wholesale=0;
- let name='',price=0,price3='',sizes=[],colors=[],description=[],byColor=[];
+ let name='',price=0,price3='',dozen='',sizes=[],colors=[],description=[],byColor=[];
  for(const rawLine of lines){const line=rawLine.replace(/^[*_-]+|[*_-]+$/g,'').trim();let m;
+  if(/\bdocena\b/i.test(line)){
+   const amount=line.match(/\$\s*(\d[\d.,]*)(?:\s*(mil|k)\b)?/i)||line.match(/docena\s*[:=\-]?\s*(\d[\d.,]*)(?:\s*(mil|k)\b)?/i);
+   if(amount && !/\bcada\b|c\/u|por par|el par/i.test(line))dozen=quickNumber(amount[1])*(amount[2]?1000:1);
+   else description.push(line);
+   continue;
+  }
   const colorRow=line.match(/^(?:color\s*:\s*)?([\p{L}][\p{L} /-]{0,35}?)\s*[:–-]\s*(?:talles?\s*)?((?:\d{1,2}\b)[\d\s,/-]*(?:(?:al?|hasta|y)\s*\d{1,2}[\d\s,/-]*)*)$/iu);
   if(colorRow&&!/^(?:calces?|talles?|n[uú]meros?|numeraci[oó]n|precio|modelo|art[ií]culo|cantidad|stock|mayorista|minorista)$/i.test(colorRow[1].trim())){
     byColor.push(colorRow[1].trim()+': '+colorRow[2]);continue;
@@ -768,10 +800,10 @@ function quickParseBlock(text){
  const full=(name+' '+text).toLowerCase();
  const audience=/\b(?:niños?|niñas?|infantil|beb[eé])\b/i.test(full)?'Niños':/\b(?:dama|mujer|femenin[oa])\b/i.test(full)?'Dama':/\b(?:caballero|hombre|masculin[oa])\b/i.test(full)?'Caballero':'Todos';
  const category=/\b(?:ojotas?|chinelas?)\b/i.test(full)?'Ojotas':/\b(?:sandalias?)\b/i.test(full)?'Sandalias':/\b(?:botas?|borcegos?)\b/i.test(full)?'Botas':/\b(?:zapatos?)\b/i.test(full)?'Zapatos':/\b(?:pantuflas?)\b/i.test(full)?'Pantuflas':/zapatilla|deportiva/i.test(full)?'Zapatillas':'Calzados';
- return {id:++quickCounter,include:true,mode:'new',name,price:price||'',price3:price3||'',audience,category,description:description.join('. ').slice(0,900),sizes:sizes.join(', '),colors:[...new Set(colors)].join(', '),byColor:byColor.join('\n'),file:null,thumb:null};
+ return {id:++quickCounter,include:true,mode:'new',name,price:price||'',price3:price3||'',dozen,audience,category,description:description.join('. ').slice(0,900),sizes:sizes.join(', '),colors:[...new Set(colors)].join(', '),byColor:byColor.join('\n'),file:null,thumb:null};
 }
 function quickCheckMatch(d){return products.find(p=>quickKey(p.name)===quickKey(d.name))||null}
-function quickParse(){const blocks=quickChatBlocks(quickEl('quickText').value);quickDrafts=blocks.slice(0,80).map(quickParseBlock);for(const d of quickDrafts){const existing=quickCheckMatch(d);if(existing){d.mode='update';if(d.price3==='')d.price3=existing.price_from_3??'';}}quickRender();quickStatus(!quickDrafts.length?'No encontré ingresos. Pegá el mensaje de WhatsApp o importá un chat .txt.':`Encontré ${quickDrafts.length} producto(s). Revisá los datos, verificá los precios y agregá las fotos antes de guardar.`);}
+function quickParse(){const blocks=quickChatBlocks(quickEl('quickText').value);quickDrafts=blocks.slice(0,80).map(quickParseBlock);for(const d of quickDrafts){const existing=quickCheckMatch(d);if(existing){d.mode='update';if(d.dozen==='')d.dozen=existing.price_dozen??'';if(d.price3==='')d.price3=existing.price_from_3??'';}}quickRender();quickStatus(!quickDrafts.length?'No encontré ingresos. Pegá el mensaje de WhatsApp o importá un chat .txt.':`Encontré ${quickDrafts.length} producto(s). Revisá los datos, verificá los precios y agregá las fotos antes de guardar.`);}
 function quickClear(){for(const d of quickDrafts)if(d.thumb)URL.revokeObjectURL(d.thumb);quickDrafts=[];quickEl('quickText').value='';quickRender();quickStatus('');quickEl('quickPhotoStatus').textContent=''}
 function quickVariantRows(d){
  if(d.byColor?.trim()){
@@ -806,6 +838,7 @@ ${match?`<p class="quick-warn">Este modelo ya existe en Mia Calzados: elegí si 
 <div class="fields">
 <div class="wide"><label>Nombre / modelo</label><input data-qfield="name" value="${esc(d.name)}" maxlength="160"></div>
 <div><label>Precio por unidad ($)</label><input data-qfield="price" type="number" min="0" step="0.01" value="${esc(d.price)}"></div>
+<div><label>Precio total por docena del modelo ($)</label><input data-qfield="dozen" type="number" min="0.01" step="0.01" placeholder="Opcional" value="${esc(d.dozen??'')}"></div>
 <div><label>Precio mayorista por par desde 3 surtidos ($)</label><input data-qfield="price3" type="number" min="0" step="0.01" value="${esc(d.price3??'')}"><div class="quick-price-note">Dejalo vacío si no hay precio especial.</div></div>
 <div><label>Público</label><select data-qfield="audience">${['Todos','Dama','Caballero','Niños'].map(x=>`<option ${d.audience===x?'selected':''}>${x}</option>`).join('')}</select></div>
 <div><label>Categoría</label><select data-qfield="category">${['Zapatillas','Zapatos','Sandalias','Ojotas','Botas','Pantuflas','Calzados'].map(x=>`<option ${d.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
@@ -846,14 +879,14 @@ async function quickUploadPhoto(file){const img=await quickCompressPhoto(file);c
 async function quickSaveAll(){
  if(quickBusy)return;if(!sb||!isAdmin)return quickStatus('Ingresá como administrador y comprobá la conexión con Supabase.');
  const selection=quickDrafts.filter(d=>d.include);if(!selection.length)return quickStatus('No hay productos seleccionados.');
- for(const d of selection){const rows=quickVariantRows(d);if(!d.name.trim()||!(Number(d.price)>0)||!rows.length)return quickStatus(`Completá el nombre, precio, talles y colores de «${d.name||'sin nombre'}».`);if(d.price3!==''&&d.price3!=null&&(!Number.isFinite(Number(d.price3))||Number(d.price3)<=0||Number(d.price3)>Number(d.price)))return quickStatus(`Precio desde 3 inválido para «${d.name}». Debe ser mayor que 0 y no superar el precio por unidad.`);if(rows.length>=180)return quickStatus('Demasiadas combinaciones en un producto: reducí los talles o colores.');if(d.mode==='update'&&!quickCheckMatch(d))return quickStatus(`Para «${d.name}» seleccionaste Actualizar, pero no hay coincidencia. Elegí Crear producto nuevo.`);}
+ for(const d of selection){const rows=quickVariantRows(d);if(!d.name.trim()||!(Number(d.price)>0)||!rows.length)return quickStatus(`Completá el nombre, precio, talles y colores de «${d.name||'sin nombre'}».`);if(d.price3!==''&&d.price3!=null&&(!Number.isFinite(Number(d.price3))||Number(d.price3)<=0||Number(d.price3)>Number(d.price)))return quickStatus(`Precio desde 3 inválido para «${d.name}». Debe ser mayor que 0 y no superar el precio por unidad.`);if(!validDozen(d.dozen,d.price3||d.price))return quickStatus("Revisá el total de la docena de "+d.name);if(rows.length>=180)return quickStatus('Demasiadas combinaciones en un producto: reducí los talles o colores.');if(d.mode==='update'&&!quickCheckMatch(d))return quickStatus(`Para «${d.name}» seleccionaste Actualizar, pero no hay coincidencia. Elegí Crear producto nuevo.`);}
  quickBusy=true;quickEl('quickSave').disabled=true;let success=[],failed=[];
  try{for(const d of selection){try{
   quickStatus(`Guardando ${success.length+failed.length+1} de ${selection.length}: ${d.name}...`);
   const existing=d.mode==='update'?quickCheckMatch(d):null;
   let imageUrl=existing?.image_url||null;
   if(d.file)imageUrl=await quickUploadPhoto(d.file);
-  const product={name:d.name.trim(),price:Number(d.price),price_from_3:d.price3!==''&&d.price3!=null?Number(d.price3):null,category:d.category,audience:d.audience,description:d.description.trim(),active:true};if(imageUrl)product.image_url=imageUrl;
+  const product={price_dozen:d.dozen?Number(d.dozen):null,name:d.name.trim(),price:Number(d.price),price_from_3:d.price3!==''&&d.price3!=null?Number(d.price3):null,category:d.category,audience:d.audience,description:d.description.trim(),active:true};if(imageUrl)product.image_url=imageUrl;
   let pid;
   if(existing){const res=await sb.from('mia_products').update(product).eq('id',existing.id).select('id').single();if(res.error)throw Error('No se pudo actualizar el producto: '+res.error.message);pid=existing.id;}
   else{const res=await sb.from('mia_products').insert(product).select('id').single();if(res.error)throw Error('No se pudo crear el producto: '+res.error.message);pid=res.data.id;}
