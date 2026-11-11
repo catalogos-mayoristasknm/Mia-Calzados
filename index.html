@@ -271,7 +271,7 @@ function setAudience(value){
 }
 function clearCatalogSearch(){document.getElementById('search').value='';if(typeof renderProducts==='function')renderProducts()}
 function shareCatalog(){
- const url='https://juancitojoni231-beep.github.io/Mia-Calzados/';
+ const url='https://catalogos-mayoristasknm.github.io/Mia-Calzados/';
  if(navigator.share){navigator.share({title:'Mayorista Mia Calzados',text:'Mirá nuestro catálogo online',url}).catch(()=>{});return}
  window.open('https://wa.me/?text='+encodeURIComponent('Te comparto el catálogo de Mayorista Mia Calzados: '+url),'_blank','noopener');
 }
@@ -465,7 +465,7 @@ productGrid.addEventListener('click',event=>{
 async function shareModel(id){
  const p=products.find(p=>String(p.id)===id && p.active);
  if(!p)return;
- const url=new URL('https://juancitojoni231-beep.github.io/Mia-Calzados/');
+ const url=new URL('https://catalogos-mayoristasknm.github.io/Mia-Calzados/');
  url.searchParams.set('modelo',id);
  const sizes=[...new Set(variants.filter(v=>v.product_id===p.id && v.size && v.size!=='A consultar').map(v=>String(v.size)))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
  const consecutive=sizes.length>2 && sizes.every((s,i)=>/^\d+$/.test(s) && (!i || Number(s)===Number(sizes[i-1])+1));
