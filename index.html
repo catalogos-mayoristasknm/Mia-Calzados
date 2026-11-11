@@ -234,7 +234,7 @@ main.wrap { padding-top:0; }
  *,*::before,*::after {animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}
 }
 .pair-cover .no-photo {font:italic 17px Georgia,serif;color:#765360;}
-.variant-search{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:12px 0}.variant-search label{flex:1;margin:0;min-width:88px;max-width:170px}.variant-search select{display:block;width:100%;margin-top:3px;min-height:44px;color:#41172d}.variant-search button,.qty-adjust button{min-height:44px}.qty-adjust{display:flex;align-items:center;gap:6px;margin-top:5px}.qty-adjust button{min-width:44px;background:#f3e5ea;color:#621738;font-weight:700}.qty-adjust output{min-width:22px;text-align:center}.cart-drawer>*{flex-shrink:0}.share-model{border:0;background:transparent;color:#831546;font-weight:650;min-height:44px;margin-top:4px}.share-model:hover{text-decoration:underline}#sharedCard{scroll-margin:12px;outline:2px solid #ae3262}#shareDialog{width:min(430px,94vw);border:0;border-radius:16px;background:#fffaf5;padding:20px}#shareDialog::backdrop{background:#25121db0}#shareText{width:100%;font:16px/1.45 system-ui}#shareTitle{font-family:Georgia,serif}#photoActions{margin:12px 0}#getPhoto{display:inline-block;padding:10px;color:#852149}#photoStatus{font-size:14px}
+.variant-search{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:12px 0}.variant-search label{flex:1;margin:0;min-width:88px;max-width:170px}.variant-search select{display:block;width:100%;margin-top:3px;min-height:44px;color:#41172d}.variant-search button,.qty-adjust button{min-height:44px}.qty-adjust{display:flex;align-items:center;gap:6px;margin-top:5px}.qty-adjust button{min-width:44px;background:#f3e5ea;color:#621738;font-weight:700}.qty-adjust output{min-width:22px;text-align:center}.cart-drawer>*{flex-shrink:0}.share-model{border:0;background:transparent;color:#831546;font-weight:650;min-height:44px;margin-top:4px}.share-model:hover{text-decoration:underline}.card[tabindex="-1"]:focus{outline:none}#sharedCard{scroll-margin:12px;outline:2px solid #ae3262}#shareDialog{width:min(430px,94vw);border:0;border-radius:16px;background:#fffaf5;padding:20px}#shareDialog::backdrop{background:#25121db0}#shareText{width:100%;font:16px/1.45 system-ui}#shareTitle{font-family:Georgia,serif}#photoActions{margin:12px 0}#getPhoto{display:inline-block;padding:10px;color:#852149}#photoStatus{font-size:14px}
 #resumeOrder:not([hidden]){display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:12px 0;padding:16px;background:#fff6f9;border:1px solid #ebcad8;border-radius:14px;color:#49182e}
 #resumeOrder strong{font:600 20px Georgia,serif}
 #resumeText{margin:5px 0 0}#resumeOrder button{min-height:44px}</style><script>
@@ -369,6 +369,30 @@ document.addEventListener('keydown',event=>{
  </div></section></main><div id="photoModal" class="photo-modal hidden" role="dialog" aria-modal="true" aria-label="Foto del producto" onclick="closeProductPhoto()"><button type="button" class="photo-modal-close" aria-label="Cerrar" onclick="closeProductPhoto()">×</button><img id="photoModalImg" alt="Foto ampliada del producto"></div><footer>Mayorista Mia Calzados · Consultas: +54 370 441-7734</footer><script>
 const SUPABASE_URL='https://keirzwfqlineridpubhn.supabase.co',KEY='sb_publishable_kP_Zy42IeRWvoIdRo9oqPw_pVZhMn4Z',WA='543704417734';let sb=null;
 let products=[],variants=[],cart=[],isAdmin=false;const el=id=>document.getElementById(id),peso=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}),fmt=n=>peso.format(n||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function msg(s){if(el('catalogLoad'))el('catalogLoad').remove();el('notice').textContent=s;const n=el('adminNotice');if(n)n.textContent=s}function show(id){cambiarSeccion(id)}let entryModel=new URLSearchParams(location.search).get('modelo');
+function clearSharedHighlight(){
+ const card=el('sharedCard');
+ if(card)card.removeAttribute('id');
+}
+window.addEventListener('pagehide',clearSharedHighlight);
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)clearSharedHighlight();
+});
+function finishSharedVisit(id,card){
+ const url=new URL(location.href);
+ if(url.searchParams.get('modelo')===id){
+  url.searchParams.delete('modelo');
+  history.replaceState(history.state,'',url.href);
+ }
+ if(!card)return;
+ requestAnimationFrame(()=>{
+  if(!card.isConnected||card.id!=='sharedCard')return;
+  card.focus({preventScroll:true});
+  card.scrollIntoView({block:'start'});
+  setTimeout(()=>{
+   if(card.id==='sharedCard')card.removeAttribute('id');
+  },2200);
+ });
+}
 async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu conexión y actualizá la página.');return}let [p,v]=await Promise.all([sb.from('mia_products').select('*').order('sort_order'),sb.from('mia_variants').select('*')]);if(p.error||v.error){msg('Error al cargar: '+(p.error||v.error).message);return}products=p.data||[];variants=v.data||[];renderProducts(entryModel);entryModel=null;restoreOrder();if(isAdmin)renderAdmin()}function renderProducts(sharedId=null){
  let q=el('search').value.toLowerCase(),a=el('audience').value;
  let found=products.filter(p=>p.active&&(!a||p.audience===a||p.audience==='Todos')&&[p.name,p.description,p.category].join(' ').toLowerCase().includes(q));
@@ -422,7 +446,7 @@ async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu co
  grid.replaceChildren();
  more.onclick=appendPage;
  appendPage();
- if(shared)requestAnimationFrame(()=>{const card=el('sharedCard');card?.focus({preventScroll:true});card?.scrollIntoView({block:'start'})});
+ if(sharedId)finishSharedVisit(sharedId,shared ? el('sharedCard') : null);
  if(!found.length)grid.textContent=q||a?'No encontramos modelos con esa búsqueda.':'No hay productos disponibles todavía.';
 }
 
