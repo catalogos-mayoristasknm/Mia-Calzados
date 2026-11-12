@@ -280,6 +280,10 @@ function setAdminTab(tab){
  document.querySelectorAll('[data-admin-tab]').forEach(btn=>{
    const a=btn.dataset.adminTab===tab;btn.classList.toggle('active',a);btn.setAttribute('aria-selected',String(a));
  });
+ const menu=document.getElementById('adminMenu');
+ menu.parentElement.classList.remove('expanded');
+ menu.setAttribute('aria-expanded','false');
+ document.getElementById('menuSection').textContent=document.querySelector('[data-admin-tab].active').textContent;
  if(tab==='productos'&&typeof renderAdmin==='function')renderAdmin();
 }
 function openProductPhoto(productId){
@@ -295,7 +299,43 @@ document.addEventListener('keydown',event=>{
    else if(!document.getElementById('cart')?.classList.contains('hidden'))cambiarSeccion('shop');
  }
 });
-</script></head><body><header class="catalog-header">
+</script>
+<style>
+#admin{background:#f5f5f8;color:#282632}
+#admin .admin-appbar{background:#252231;padding:14px max(18px,calc((100% - 1180px)/2));color:white}
+#admin .appbar-brand strong,#admin .admin-sectionheading h2{font-family:system-ui,sans-serif;font-weight:680}
+#admin>.admin-brand{display:none}
+#admin #login{max-width:430px;margin:42px auto;padding:26px}
+#admin #login h2{margin:0 0 18px}
+#adminArea:not(.hidden){width:min(1180px,calc(100% - 32px));margin:18px auto;display:grid;grid-template-columns:215px minmax(0,1fr);gap:24px;align-items:start}
+#admin .admin-navrow{position:sticky;top:85px;margin:0;border:0;border-radius:14px;background:#292534;padding:12px;overflow:visible}
+#admin .admin-nav{display:grid;gap:5px;min-width:0;padding:0}
+#admin .admin-nav button,#admin .menu-switch{width:100%;text-align:left;background:transparent;color:#eee8f1;border:0;border-radius:8px;padding:12px;font:600 14px system-ui}
+#admin .admin-nav button.active{background:#713653;color:white;box-shadow:inset 3px 0 #ffa7cb}
+#admin .side-brand{display:flex;gap:10px;align-items:center;color:white;padding:7px 2px 16px}
+#admin .side-brand img{width:42px;height:42px;background:white;object-fit:contain;border-radius:10px}
+#admin .menu-switch{display:none}
+#admin .admin-sectionheading{margin:0 0 16px}
+#admin .admin-pane{min-width:0}
+#admin .admin-pane>.panel{border-color:#dedbe3;box-shadow:0 3px 12px #26203208}
+#admin .model-item{padding:14px 0;border-top:1px solid #e4dfe6}
+#admin .model-line{display:flex;align-items:center;gap:12px}
+#admin .model-info{flex:1;min-width:0;overflow-wrap:anywhere}
+#admin .model-img{width:52px;height:52px;object-fit:cover;background:#f3edf1;border-radius:9px}
+#admin .model-item details{margin-top:10px}
+#admin .model-item summary{cursor:pointer;color:#752343;font-weight:600;padding:5px 0}
+@media(max-width:760px){
+ #adminArea:not(.hidden){display:block;width:calc(100% - 24px)}
+ #admin .admin-navrow{position:static;margin-bottom:16px}
+ #admin .side-brand{display:none}
+ #admin .menu-switch{display:flex;justify-content:space-between}
+ #admin .admin-navrow:not(.expanded) .admin-nav{display:none}
+ #admin .model-item .line{display:grid;grid-template-columns:1fr 1fr}
+ #admin .model-item .line input{width:100%;min-width:0}
+ #admin .model-item .line button{grid-column:1/-1}
+}
+</style>
+</head><body><header class="catalog-header">
  <div class="header-inner">
 
   <div class="catalog-headrow">
@@ -335,13 +375,13 @@ document.addEventListener('keydown',event=>{
 </section><section id="admin" class="admin-overlay hidden">
  <div class="admin-appbar"><div class="appbar-brand"><span class="mini-kicker">PANEL DE CONTROL</span><strong>Administrar catálogo online</strong></div><button type="button" class="admin-exit" onclick="cambiarSeccion('shop')">✕ Cerrar</button></div>
  <p id="adminNotice" class="admin-notice" role="status"></p>
-<div class="admin-brand"><img id="adminLogo" alt="Mia Calzados" width="54" height="54"><div><strong>Administración · Mia Calzados</strong><small>Gestión de modelos, talles, colores y precios</small></div></div><div id="login" class="panel"><label>Correo</label><input id="email" type="email"><label>Contraseña</label><input id="password" type="password"><p><button onclick="login()">Ingresar</button></p></div><div id="adminArea" class="hidden">
- <div class="admin-navrow"><div class="admin-nav" role="tablist" aria-label="Secciones de administración">
-  <button type="button" role="tab" data-admin-tab="productos" onclick="setAdminTab('productos')" class="active">📦 Productos</button>
-  <button type="button" role="tab" data-admin-tab="agregar" onclick="setAdminTab('agregar')">＋ Agregar</button>
-  <button type="button" role="tab" data-admin-tab="rapida" onclick="setAdminTab('rapida')">⚡ Carga rápida</button>
-  <button type="button" role="tab" data-admin-tab="pedidos" onclick="setAdminTab('pedidos')">🧾 Pedidos</button>
-  <button type="button" role="tab" data-admin-tab="ajustes" onclick="setAdminTab('ajustes')">⚙ Ajustes</button>
+<div class="admin-brand"><img id="adminLogo" alt="Mia Calzados" width="54" height="54"><div><strong>Administración · Mia Calzados</strong><small>Gestión de modelos, talles, colores y precios</small></div></div><div id="login" class="panel"><h2>Ingresar a Mia Calzados</h2><label>Correo</label><input id="email" type="email"><label>Contraseña</label><input id="password" type="password"><p><button onclick="login()">Ingresar</button></p></div><div id="adminArea" class="hidden">
+ <div class="admin-navrow"><div class="side-brand"><img id="sideLogo" alt=""><strong>Mia Calzados</strong></div><button class="menu-switch" id="adminMenu" type="button" aria-expanded="false" aria-controls="adminSections" onclick="this.setAttribute('aria-expanded',this.parentElement.classList.toggle('expanded'))"><span id="menuSection">Productos</span><span>Menú ☰</span></button><div id="adminSections" class="admin-nav" role="tablist" aria-label="Secciones de administración">
+  <button type="button" role="tab" data-admin-tab="productos" onclick="setAdminTab('productos')" class="active">Productos</button>
+  <button type="button" role="tab" data-admin-tab="agregar" onclick="setAdminTab('agregar')">Agregar modelo</button>
+  <button type="button" role="tab" data-admin-tab="rapida" onclick="setAdminTab('rapida')">Carga rápida</button>
+  <button type="button" role="tab" data-admin-tab="pedidos" onclick="setAdminTab('pedidos')">Pedidos</button>
+  <button type="button" role="tab" data-admin-tab="ajustes" onclick="setAdminTab('ajustes')">Ajustes</button>
  </div></div>
  <div class="admin-pane active" data-pane="productos"><div class="admin-sectionheading"><div><span class="eyebrow">TU CATÁLOGO</span><h2>Productos guardados</h2></div><button type="button" onclick="setAdminTab('agregar')">＋ Nuevo producto</button></div>
  <div class="panel"><input id="adminSearch" class="admin-search" type="search" placeholder="🔎 Buscar un producto…" oninput="renderAdmin()"><div id="adminProducts"></div></div></div>
@@ -365,7 +405,7 @@ document.addEventListener('keydown',event=>{
 </div></div>
 </div>
  <div class="admin-pane" data-pane="pedidos"><div class="panel"><h2>🧾 Pedidos y consultas</h2><p>Actualmente los clientes envían sus pedidos a WhatsApp de Mia Calzados. Las conversaciones no se registran automáticamente como pedidos en este panel.</p><p>Podés revisarlos directamente desde el WhatsApp del negocio.</p><a class="action-link" href="https://wa.me/543704417734" target="_blank" rel="noopener">Abrir WhatsApp de Mia</a></div></div>
- <div class="admin-pane" data-pane="ajustes"><div class="panel"><h2>⚙ Ajustes</h2><p><strong>Negocio:</strong> Mayorista Mia Calzados</p><p><strong>Pedidos:</strong> WhatsApp +54 370 441-7734</p><p><strong>Precios:</strong> por unidad y por unidad desde 3 pares surtidos</p><p><strong>Stock:</strong> no se controla por cantidad; los talles y colores se consultan</p><div class="settings-actions"><button type="button" onclick="load().then(()=>msg('Catálogo actualizado'))">Actualizar productos</button><button type="button" class="light" onclick="logout()">Cerrar sesión</button></div></div></div>
+ <div class="admin-pane" data-pane="ajustes"><div class="panel"><h2>⚙ Ajustes</h2><p><strong>Negocio:</strong> Mayorista Mia Calzados</p><p><strong>Pedidos:</strong> WhatsApp +54 370 441-7734</p><p><strong>Precios:</strong> por par, desde 3 pares y por docena surtida según el modelo</p><p><strong>Stock:</strong> no se controla por cantidad; los talles y colores se consultan</p><div class="settings-actions"><button type="button" onclick="load().then(()=>msg('Catálogo actualizado'))">Actualizar productos</button><button type="button" class="light" onclick="logout()">Cerrar sesión</button></div></div></div>
  </div></section></main><div id="photoModal" class="photo-modal hidden" role="dialog" aria-modal="true" aria-label="Foto del producto" onclick="closeProductPhoto()"><button type="button" class="photo-modal-close" aria-label="Cerrar" onclick="closeProductPhoto()">×</button><img id="photoModalImg" alt="Foto ampliada del producto"></div><footer>Mayorista Mia Calzados · Consultas: +54 370 441-7734</footer><script>
 const SUPABASE_URL='https://keirzwfqlineridpubhn.supabase.co',KEY='sb_publishable_kP_Zy42IeRWvoIdRo9oqPw_pVZhMn4Z',WA='543704417734';let sb=null;
 let products=[],variants=[],cart=[],isAdmin=false;const el=id=>document.getElementById(id),peso=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}),fmt=n=>peso.format(n||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function msg(s){if(el('catalogLoad'))el('catalogLoad').remove();el('notice').textContent=s;const n=el('adminNotice');if(n)n.textContent=s}function show(id){cambiarSeccion(id)}let entryModel=new URLSearchParams(location.search).get('modelo');
@@ -478,11 +518,15 @@ productGrid.addEventListener('click',event=>{
  const photo=event.target.closest('[data-photo]');
  if(photo)openProductPhoto(photo.dataset.photo);
 });
+function modelLink(id){
+ const url=new URL('https://catalogos-mayoristasknm.github.io/Mia-Calzados/');
+ url.searchParams.set('modelo',id);
+ return url;
+}
 async function shareModel(id){
  const p=products.find(p=>String(p.id)===id && p.active);
  if(!p)return;
- const url=new URL('https://catalogos-mayoristasknm.github.io/Mia-Calzados/');
- url.searchParams.set('modelo',id);
+ const url=modelLink(id);
  const sizes=[...new Set(variants.filter(v=>v.product_id===p.id && v.size && v.size!=='A consultar').map(v=>String(v.size)))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
  const consecutive=sizes.length>2 && sizes.every((s,i)=>/^\d+$/.test(s) && (!i || Number(s)===Number(sizes[i-1])+1));
  const range=consecutive?sizes[0]+' al '+sizes.at(-1):sizes.join(', ');
@@ -693,6 +737,7 @@ function sendWhatsApp(){
  const t=['Hola, quiero consultar disponibilidad de este pedido en Mayorista Mia Calzados:',
   'Cliente: '+name,el('phone').value.trim()?'Teléfono: '+el('phone').value.trim():'',
   ...cart.map(x=>isAssorted(x)?`• ${x.name} / ${assortedLabel(x.qty)}`:`• ${x.name} / Talle ${x.size} / ${x.color} / ${x.qty} u.${charges.get(x.product).detail?'':' × '+fmt(cartUnitPrice(x))+' = '+fmt(x.qty*cartUnitPrice(x))+(cartHasPromo(x)?' (mayorista)':'')}`),
+  ...Array.from(new Map(cart.map(x=>[x.product,x.name])),([id,name])=>'Ver '+name+': '+modelLink(id)),
   ...Array.from(charges.values()).filter(g=>g.detail).map(g=>g.item.name+' · '+g.detail),
   'Total estimado: '+fmt(cartTotal()),
   el('notes').value.trim()?'Notas: '+el('notes').value.trim():'',
@@ -712,11 +757,11 @@ async function refreshAdmin(){if(!sb){el('login').classList.remove('hidden');el(
  clearForm();await load();msg('Producto y precios guardados');
 }
 function editProduct(id){let p=products.find(x=>x.id===id);if(!p)return;for(const [key,val] of Object.entries({pid:p.id,pname:p.name,pprice:p.price,pprice3:p.price_from_3??'',pdozen:p.price_dozen??'',pcategory:p.category,paudience:p.audience,pdesc:p.description,pimage:p.image_url||''}))el(key).value=val;el('pactive').checked=p.active;el('formTitle').textContent='Editar producto';setAdminTab('agregar');el('formTitle').scrollIntoView({behavior:'smooth'})}function renderAdmin(){
- el('adminProducts').innerHTML=products.filter(p=>p.name.toLowerCase().includes((el('adminSearch')?.value||'').toLowerCase())).map(p=>`<div class="panel" style="margin:10px 0">
- <div class="row"><div><strong>${esc(p.name)}</strong><div class="muted">Unidad ${fmt(p.price)}${Number(p.price_from_3)>0?` · Desde 3 ${fmt(p.price_from_3)}`:''} ${Number(p.price_dozen)>0?' · Docena '+fmt(p.price_dozen):''} · ${p.active?'Visible':'Oculto'}</div></div><button class="light" onclick="editProduct('${p.id}')">Editar</button></div>
- <div id="vars-${p.id}">${variants.filter(v=>v.product_id===p.id).map(v=>`<div class="row"><span>Talle ${esc(v.size)} · Color ${esc(v.color)}</span></div>`).join('')||'<p class="muted">Todavía sin talles y colores. Los clientes podrán consultarlos por WhatsApp.</p>'}</div>
- <div class="line" style="margin-top:10px"><input id="size-${p.id}" placeholder="Talle (ej. 38)"><input id="color-${p.id}" placeholder="Color"><button onclick="addVariant('${p.id}')">Agregar talle/color</button></div>
- </div>`).join('')||'<p>No hay productos cargados.</p>';
+ el('adminProducts').innerHTML=products.filter(p=>p.name.toLowerCase().includes((el('adminSearch')?.value||'').toLowerCase())).map(p=>`<div class="model-item">
+ <div class="model-line">${p.image_url?`<img class="model-img" src="${esc(p.image_url)}" loading="lazy" alt="">`:''}<div class="model-info"><strong>${esc(p.name)}</strong><div class="muted">Unidad ${fmt(p.price)}${Number(p.price_from_3)>0?` · Desde 3 ${fmt(p.price_from_3)}`:''} ${Number(p.price_dozen)>0?' · Docena '+fmt(p.price_dozen):''} · ${p.active?'Visible':'Oculto'}</div></div><button class="light" onclick="editProduct('${p.id}')">Editar</button></div>
+ <details><summary>Talles y colores</summary><div id="vars-${p.id}">${variants.filter(v=>v.product_id===p.id).map(v=>`<div class="row"><span>Talle ${esc(v.size)} · Color ${esc(v.color)}</span></div>`).join('')||'<p class="muted">Todavía sin talles y colores. Los clientes podrán consultarlos por WhatsApp.</p>'}</div>
+ <div class="line" style="margin-top:10px"><input id="size-${p.id}" placeholder="Talle (ej. 38)"><input id="color-${p.id}" placeholder="Color"><button onclick="addVariant('${p.id}')">Agregar talle/color</button></div></details>
+ </div>`).join('')||(products.length?'<p>No se encontraron modelos con ese nombre.</p>':'<p>No hay productos cargados.</p>');
 }
 async function addVariant(pid){
  const size=el('size-'+pid)?.value.trim(),color=el('color-'+pid)?.value.trim();
@@ -921,7 +966,7 @@ async function quickSaveAll(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
- document.getElementById('adminLogo').src=document.querySelector('.catalog-brand img').src;
+ document.getElementById('sideLogo').src=document.getElementById('adminLogo').src=document.querySelector('.catalog-brand img').src;
  try { if(window.supabase) sb=window.supabase.createClient(SUPABASE_URL,KEY); }
 catch(e){ console.error('Error al iniciar Supabase:',e); }
 if(sb){load()}else{msg('No se pudo conectar a Supabase. Revisá la conexión a internet y actualizá la página.')}
