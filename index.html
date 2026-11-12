@@ -335,7 +335,20 @@ document.addEventListener('keydown',event=>{
  #admin .model-item .line button{grid-column:1/-1}
 }
 </style>
-</head><body><header class="catalog-header">
+<style>
+#packingOrder{box-sizing:border-box;width:min(590px,94vw);max-height:90dvh;border:0;border-radius:18px;padding:0;color:#311d2a;background:#fffaf8;box-shadow:0 20px 80px #26142342}
+#packingOrder::backdrop{background:#241524bb}
+.packing-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;background:#fff;position:sticky;top:0;border-bottom:1px solid #e8dade}
+.packing-head h2{margin:0;font:600 22px Georgia,serif}
+#packingRows{padding:0 18px}
+.pack-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:14px;align-items:center;padding:16px 0;border-bottom:1px solid #e9dfe3;overflow-wrap:anywhere}
+.pack-row img,.pack-photo{width:70px;height:76px;object-fit:contain;background:#f2eaed;border-radius:9px}
+.pack-photo{display:grid;place-items:center;color:#665260;font-size:12px}
+.pack-row h3{margin:5px 0;font-size:17px}
+.pack-row p{margin:0}
+.pack-type{display:inline-block;padding:3px 8px;border-radius:6px;background:#e9edf5;color:#314764;font-size:12px;font-weight:700}
+.pack-type.dozen{background:#f7d9e6;color:#722244}
+</style></head><body><header class="catalog-header">
  <div class="header-inner">
 
   <div class="catalog-headrow">
@@ -406,7 +419,7 @@ document.addEventListener('keydown',event=>{
 </div>
  <div class="admin-pane" data-pane="pedidos"><div class="panel"><h2>🧾 Pedidos y consultas</h2><p>Actualmente los clientes envían sus pedidos a WhatsApp de Mia Calzados. Las conversaciones no se registran automáticamente como pedidos en este panel.</p><p>Podés revisarlos directamente desde el WhatsApp del negocio.</p><a class="action-link" href="https://wa.me/543704417734" target="_blank" rel="noopener">Abrir WhatsApp de Mia</a></div></div>
  <div class="admin-pane" data-pane="ajustes"><div class="panel"><h2>⚙ Ajustes</h2><p><strong>Negocio:</strong> Mayorista Mia Calzados</p><p><strong>Pedidos:</strong> WhatsApp +54 370 441-7734</p><p><strong>Precios:</strong> por par, desde 3 pares y por docena surtida según el modelo</p><p><strong>Stock:</strong> no se controla por cantidad; los talles y colores se consultan</p><div class="settings-actions"><button type="button" onclick="load().then(()=>msg('Catálogo actualizado'))">Actualizar productos</button><button type="button" class="light" onclick="logout()">Cerrar sesión</button></div></div></div>
- </div></section></main><div id="photoModal" class="photo-modal hidden" role="dialog" aria-modal="true" aria-label="Foto del producto" onclick="closeProductPhoto()"><button type="button" class="photo-modal-close" aria-label="Cerrar" onclick="closeProductPhoto()">×</button><img id="photoModalImg" alt="Foto ampliada del producto"></div><footer>Mayorista Mia Calzados · Consultas: +54 370 441-7734</footer><script>
+ </div></section></main><dialog id="packingOrder" aria-labelledby="packingTitle"><div class="packing-head"><h2 id="packingTitle">Detalle del pedido</h2><button type="button" onclick="this.closest('dialog').close()">Cerrar</button></div><div id="packingRows"></div></dialog><div id="photoModal" class="photo-modal hidden" role="dialog" aria-modal="true" aria-label="Foto del producto" onclick="closeProductPhoto()"><button type="button" class="photo-modal-close" aria-label="Cerrar" onclick="closeProductPhoto()">×</button><img id="photoModalImg" alt="Foto ampliada del producto"></div><footer>Mayorista Mia Calzados · Consultas: +54 370 441-7734</footer><script>
 const SUPABASE_URL='https://keirzwfqlineridpubhn.supabase.co',KEY='sb_publishable_kP_Zy42IeRWvoIdRo9oqPw_pVZhMn4Z',WA='543704417734';let sb=null;
 let products=[],variants=[],cart=[],isAdmin=false;const el=id=>document.getElementById(id),peso=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}),fmt=n=>peso.format(n||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function msg(s){if(el('catalogLoad'))el('catalogLoad').remove();el('notice').textContent=s;const n=el('adminNotice');if(n)n.textContent=s}function show(id){cambiarSeccion(id)}let entryModel=new URLSearchParams(location.search).get('modelo');
 function clearSharedHighlight(){
@@ -730,6 +743,38 @@ el('cartItems').addEventListener('click',event=>{
  const next=el('cartItems').querySelector('[data-index="'+index+'"][data-delta="'+button.dataset.delta+'"]:not(:disabled)')||el('cartItems').querySelector('[data-index="'+index+'"][data-delta="1"]');
  next?.focus();
 });
+function packingLink(items){
+ const rows=items.map(x=>[x.product,x.name,x.qty,...(isAssorted(x)?[]:[x.size,x.color])]);
+ const url=modelLink(items[0].product);
+ url.search='';
+ const bytes=new TextEncoder().encode(JSON.stringify(rows));
+ url.hash='pedido='+btoa(Array.from(bytes,b=>String.fromCharCode(b)).join('')).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
+ return url.href;
+}
+function showPackingOrder(){
+ if(!location.hash.startsWith('#pedido='))return;
+ const dialog=el('packingOrder'),list=el('packingRows');
+ try{
+  const bytes=Uint8Array.from(atob(location.hash.slice(8).replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0));
+  const rows=JSON.parse(new TextDecoder().decode(bytes));
+  if(!Array.isArray(rows)||!rows.length)throw Error();
+  list.innerHTML=rows.map(row=>{
+   if(!Array.isArray(row)||![3,5].includes(row.length))throw Error();
+   const [id,name,qty,size,color]=row,dozen=row.length===3;
+   if(typeof name!=='string'||!Number.isSafeInteger(qty)||qty<1||(dozen&&qty%12))throw Error();
+   const photo=products.find(p=>String(p.id)===String(id))?.image_url;
+   const image=photo&&/^https?:\/\//i.test(photo)?`<img src="${esc(photo)}" alt="${esc(name)}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden>Sin foto</span>`:'<span class="pack-photo">Sin foto</span>';
+   const label=dozen?(qty/12===1?'1 docena surtida':qty/12+' docenas surtidas'):(qty===1?'1 par':qty+' pares');
+   const detail=dozen?qty+' pares · Talles y colores surtidos':'Talle '+esc(size)+' · Color '+esc(color);
+   return `<article class="pack-row">${image}<div><span class="pack-type ${dozen?'dozen':''}">${label}</span><h3>${esc(name)}</h3><p>${detail}</p></div></article>`;
+  }).join('');
+ }catch{list.innerHTML='<p>El enlace está incompleto. Pedí que te reenvíen el mensaje original.</p>'}
+ if(!dialog.open)dialog.showModal();
+}
+el('packingOrder').addEventListener('close',()=>{
+ if(location.hash.startsWith('#pedido='))history.replaceState(history.state,'',location.pathname+location.search);
+});
+window.addEventListener('hashchange',showPackingOrder);
 function sendWhatsApp(){
  if(!cart.length)return msg('Agregá productos primero');
  const name=el('customer').value.trim();if(!name)return msg('Ingresá tu nombre');
@@ -737,7 +782,7 @@ function sendWhatsApp(){
  const t=['Hola, quiero consultar disponibilidad de este pedido en Mayorista Mia Calzados:',
   'Cliente: '+name,el('phone').value.trim()?'Teléfono: '+el('phone').value.trim():'',
   ...cart.map(x=>isAssorted(x)?`• ${x.name} / ${assortedLabel(x.qty)}`:`• ${x.name} / Talle ${x.size} / ${x.color} / ${x.qty} u.${charges.get(x.product).detail?'':' × '+fmt(cartUnitPrice(x))+' = '+fmt(x.qty*cartUnitPrice(x))+(cartHasPromo(x)?' (mayorista)':'')}`),
-  ...Array.from(new Map(cart.map(x=>[x.product,x.name])),([id,name])=>'Ver '+name+': '+modelLink(id)),
+  'Ver pedido con fotos: '+packingLink(cart),
   ...Array.from(charges.values()).filter(g=>g.detail).map(g=>g.item.name+' · '+g.detail),
   'Total estimado: '+fmt(cartTotal()),
   el('notes').value.trim()?'Notas: '+el('notes').value.trim():'',
@@ -969,6 +1014,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  document.getElementById('sideLogo').src=document.getElementById('adminLogo').src=document.querySelector('.catalog-brand img').src;
  try { if(window.supabase) sb=window.supabase.createClient(SUPABASE_URL,KEY); }
 catch(e){ console.error('Error al iniciar Supabase:',e); }
-if(sb){load()}else{msg('No se pudo conectar a Supabase. Revisá la conexión a internet y actualizá la página.')}
+showPackingOrder();
+if(sb){load().then(showPackingOrder)}else{msg('No se pudo conectar a Supabase. Revisá la conexión a internet y actualizá la página.')}
 });
 </script></body></html>
