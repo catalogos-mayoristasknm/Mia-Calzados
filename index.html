@@ -234,7 +234,7 @@ main.wrap { padding-top:0; }
  *,*::before,*::after {animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}
 }
 .pair-cover .no-photo {font:italic 17px Georgia,serif;color:#765360;}
-.variant-search{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:12px 0}.variant-search label{flex:1;margin:0;min-width:88px;max-width:170px}.variant-search select{display:block;width:100%;margin-top:3px;min-height:44px;color:#41172d}.variant-search button,.qty-adjust button{min-height:44px}.qty-adjust{display:flex;align-items:center;gap:6px;margin-top:5px}.qty-adjust button{min-width:44px;background:#f3e5ea;color:#621738;font-weight:700}.qty-adjust output{min-width:22px;text-align:center}.cart-drawer>*{flex-shrink:0}.share-model{border:0;background:transparent;color:#831546;font-weight:650;min-height:44px;margin-top:4px}.share-model:hover{text-decoration:underline}.card[tabindex="-1"]:focus{outline:none}#sharedCard{scroll-margin:12px;outline:2px solid #ae3262}#shareDialog{width:min(430px,94vw);border:0;border-radius:16px;background:#fffaf5;padding:20px}#shareDialog::backdrop{background:#25121db0}#shareText{width:100%;font:16px/1.45 system-ui}#shareTitle{font-family:Georgia,serif}#photoActions{margin:12px 0}#getPhoto{display:inline-block;padding:10px;color:#852149}#photoStatus{font-size:14px}
+.dozen-button{min-height:44px;width:100%;background:#70123b;color:#fff;font-weight:700}.variant-search{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:12px 0}.variant-search label{flex:1;margin:0;min-width:88px;max-width:170px}.variant-search select{display:block;width:100%;margin-top:3px;min-height:44px;color:#41172d}.variant-search button,.qty-adjust button{min-height:44px}.qty-adjust{display:flex;align-items:center;gap:6px;margin-top:5px}.qty-adjust button{min-width:44px;background:#f3e5ea;color:#621738;font-weight:700}.qty-adjust output{min-width:22px;text-align:center}.cart-drawer>*{flex-shrink:0}.share-model{border:0;background:transparent;color:#831546;font-weight:650;min-height:44px;margin-top:4px}.share-model:hover{text-decoration:underline}.card[tabindex="-1"]:focus{outline:none}#sharedCard{scroll-margin:12px;outline:2px solid #ae3262}#shareDialog{width:min(430px,94vw);border:0;border-radius:16px;background:#fffaf5;padding:20px}#shareDialog::backdrop{background:#25121db0}#shareText{width:100%;font:16px/1.45 system-ui}#shareTitle{font-family:Georgia,serif}#photoActions{margin:12px 0}#getPhoto{display:inline-block;padding:10px;color:#852149}#photoStatus{font-size:14px}
 #resumeOrder:not([hidden]){display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:12px 0;padding:16px;background:#fff6f9;border:1px solid #ebcad8;border-radius:14px;color:#49182e}
 #resumeOrder strong{font:600 20px Georgia,serif}
 #resumeText{margin:5px 0 0}#resumeOrder button{min-height:44px}</style><script>
@@ -455,11 +455,24 @@ function validDozen(value,unit){
 }
 function pairPrices(p){
  const bulk=Number(p.price_from_3)>0 ? `<div class="bulkprice">${fmt(p.price_from_3)}<small>Mayorista · desde 3 pares surtidos</small></div>` : '';
- return `<div class="pricelevels"><div class="unitprice">${fmt(p.price)}<small>El par</small></div>${bulk}${Number(p.price_dozen)>0?`<div class="bulkprice">${fmt(p.price_dozen)}<small>La docena · 12 pares del mismo modelo</small></div>`:''}</div>`;
+ return `<div class="pricelevels"><div class="unitprice">${fmt(p.price)}<small>El par</small></div>${bulk}${Number(p.price_dozen)>0?`<div class="bulkprice">${fmt(p.price_dozen)}<small>Talles y colores surtidos · 12 pares del mismo modelo</small></div><button type="button" data-dozen="${esc(p.id)}" class="dozen-button">Pedir una docena</button>`:''}</div>`;
 }
 el('resetVariants').onclick=()=>{el('catalogSize').value='';el('catalogColor').value='';renderProducts()};
 const productGrid=el('products');
 productGrid.addEventListener('click',event=>{
+ const button=event.target.closest('[data-dozen]');
+ if(button){
+  const product=products.find(p=>String(p.id)===button.dataset.dozen && p.active);
+  if(!product || !(Number(product.price_dozen)>0))return;
+  const row=cart.find(item=>item.product===product.id && isAssorted(item));
+  if(row)row.qty+=12;
+  else cart.push({product:product.id,variant:product.id+'-docena',name:product.name,price:Number(product.price),qty:12});
+  persistOrder();
+  el('count').textContent='('+cartQty()+')';
+  updateBar();
+  button.closest('article').querySelector('.choice-note').textContent='Docena agregada. '+assortedLabel(row?.qty||12)+' en tu pedido.';
+  return;
+ }
  const share=event.target.closest('[data-share]');
  if(share){shareModel(share.dataset.share);return}
  const photo=event.target.closest('[data-photo]');
@@ -604,6 +617,10 @@ function restoreOrder(){
   if(!row||!Number.isSafeInteger(row.qty)||row.qty<1)continue;
   const p=products.find(p=>p.active&&p.id===row.product);
   if(!p)continue;
+  if(isAssorted(row)){
+   if(Number(p.price_dozen)>0 && row.qty%12===0)restored.push({product:p.id,variant:row.variant,qty:row.qty,name:p.name,price:Number(p.price)});
+   continue;
+  }
   const options=variants.filter(v=>v.product_id===p.id);
   const v=options.length?options.find(v=>v.id===row.variant):
    row.variant===p.id+'-consultar'?{id:row.variant,size:'A consultar',color:'A consultar'}:null;
@@ -617,6 +634,10 @@ function restoreOrder(){
 }
 window.addEventListener('storage',e=>{if(catalogReady&&(e.key===orderKey||e.key===null))restoreOrder()});
 document.addEventListener('visibilitychange',()=>{if(catalogReady&&!document.hidden)showResume()});
+function isAssorted(item){return item.variant===item.product+'-docena'}
+function assortedLabel(qty){
+ return (qty===12?'1 docena surtida':(qty/12)+' docenas surtidas')+' · '+qty+' pares · talles y colores surtidos';
+}
 function cartQty(){return cart.reduce((sum,item)=>sum+item.qty,0)}
 function cartUnitPrice(item){
  const p=products.find(x=>x.id===item.product);
@@ -651,14 +672,15 @@ function renderCart(){
  updateBar();
  document.querySelectorAll('.choice-note').forEach(note=>note.textContent='');
  const charges=modelCharges();
- el('cartItems').innerHTML=cart.length?cart.map((x,i)=>`<div class="row"><div><strong>${esc(x.name)}</strong><div class="muted">${esc(x.size)} · ${esc(x.color)} · ${x.qty} ${charges.get(x.product).detail?"par(es)":"× "+fmt(cartUnitPrice(x))}</div>${charges.get(x.product).detail?(charges.get(x.product).item===x?'<div class="discounttag">Total del modelo · '+charges.get(x.product).detail+'</div>':''):cartHasPromo(x)?'<div class="discounttag">✓ Precio mayorista aplicado</div>':''}<div class="qty-adjust"><button type="button" aria-label="Restar un par" data-delta="-1" data-index="${i}" ${x.qty<=1?'disabled':''}>−</button><output>${x.qty}</output><button type="button" aria-label="Sumar un par" data-delta="1" data-index="${i}">+</button></div></div><button class="danger" onclick="cart.splice(${i},1);persistOrder();el('count').textContent='('+cart.reduce((s,x)=>s+x.qty,0)+')';renderCart()">Quitar</button></div>`).join(''):'Todavía no agregaste productos';
+ el('cartItems').innerHTML=cart.length?cart.map((x,i)=>`<div class="row"><div><strong>${esc(x.name)}</strong><div class="muted">${isAssorted(x)?assortedLabel(x.qty):esc(x.size)+' · '+esc(x.color)+' · '+x.qty+' '+(charges.get(x.product).detail?'par(es)':'× '+fmt(cartUnitPrice(x)))}</div>${charges.get(x.product).detail?(charges.get(x.product).item===x?'<div class="discounttag">Total del modelo · '+charges.get(x.product).detail+'</div>':''):cartHasPromo(x)?'<div class="discounttag">✓ Precio mayorista aplicado</div>':''}<div class="qty-adjust"><button type="button" aria-label="Restar ${isAssorted(x)?'una docena':'un par'}" data-delta="-1" data-index="${i}" ${x.qty<=(isAssorted(x)?12:1)?'disabled':''}>−</button><output>${isAssorted(x)?x.qty/12:x.qty}</output><button type="button" aria-label="Sumar ${isAssorted(x)?'una docena':'un par'}" data-delta="1" data-index="${i}">+</button></div></div><button class="danger" onclick="cart.splice(${i},1);persistOrder();el('count').textContent='('+cart.reduce((s,x)=>s+x.qty,0)+')';renderCart()">Quitar</button></div>`).join(''):'Todavía no agregaste productos';
  el('total').textContent='Total estimado: '+fmt(cartTotal());
 }
 el('cartItems').addEventListener('click',event=>{
  const button=event.target.closest('[data-delta]');if(!button)return;
  const index=Number(button.dataset.index),item=cart[index];
  if(!item)return;
- item.qty=Math.max(1,item.qty+Number(button.dataset.delta));
+ const step=isAssorted(item)?12:1;
+ item.qty=Math.max(step,item.qty+Number(button.dataset.delta)*step);
  persistOrder();
  el('count').textContent='('+cartQty()+')'; renderCart();
  const next=el('cartItems').querySelector('[data-index="'+index+'"][data-delta="'+button.dataset.delta+'"]:not(:disabled)')||el('cartItems').querySelector('[data-index="'+index+'"][data-delta="1"]');
@@ -670,7 +692,7 @@ function sendWhatsApp(){
  const charges=modelCharges();
  const t=['Hola, quiero consultar disponibilidad de este pedido en Mayorista Mia Calzados:',
   'Cliente: '+name,el('phone').value.trim()?'Teléfono: '+el('phone').value.trim():'',
-  ...cart.map(x=>`• ${x.name} / Talle ${x.size} / ${x.color} / ${x.qty} u.${charges.get(x.product).detail?'':' × '+fmt(cartUnitPrice(x))+' = '+fmt(x.qty*cartUnitPrice(x))+(cartHasPromo(x)?' (mayorista)':'')}`),
+  ...cart.map(x=>isAssorted(x)?`• ${x.name} / ${assortedLabel(x.qty)}`:`• ${x.name} / Talle ${x.size} / ${x.color} / ${x.qty} u.${charges.get(x.product).detail?'':' × '+fmt(cartUnitPrice(x))+' = '+fmt(x.qty*cartUnitPrice(x))+(cartHasPromo(x)?' (mayorista)':'')}`),
   ...Array.from(charges.values()).filter(g=>g.detail).map(g=>g.item.name+' · '+g.detail),
   'Total estimado: '+fmt(cartTotal()),
   el('notes').value.trim()?'Notas: '+el('notes').value.trim():'',
