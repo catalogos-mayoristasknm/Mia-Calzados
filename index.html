@@ -446,7 +446,33 @@ function finishSharedVisit(id,card){
   },2200);
  });
 }
-async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu conexión y actualizá la página.');return}let [p,v]=await Promise.all([sb.from('mia_products').select('*').order('sort_order'),sb.from('mia_variants').select('*')]);if(p.error||v.error){msg('Error al cargar: '+(p.error||v.error).message);return}products=p.data||[];variants=v.data||[];renderProducts(entryModel);entryModel=null;restoreOrder();if(isAdmin)renderAdmin()}function renderProducts(sharedId=null){
+async function loadAllVariants(){
+ const rows=[];
+ const pageSize=500;
+ for(let offset=0;;offset+=pageSize){
+  const page=await sb.from('mia_variants').select('*').order('id').range(offset,offset+pageSize-1);
+  if(page.error)return page;
+  rows.push(...page.data);
+  if(page.data.length<pageSize)break;
+ }
+ return {data:expandSavedSizes(rows)};
+}
+function expandSavedSizes(rows){
+ const key=v=>JSON.stringify([v.product_id,v.color,v.size]);
+ const seen=new Set(rows.map(key));
+ return rows.flatMap(v=>{
+  const sizes=quickSizes(v.size);
+  if(sizes.length<2||!sizes.every(size=>/^\d{1,2}$/.test(size)))return [v];
+  return sizes.flatMap(size=>{
+   const option={...v,size,id:v.id+'-talle-'+size};
+   const k=key(option);
+   if(seen.has(k))return [];
+   seen.add(k);
+   return [option];
+  });
+ });
+}
+async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu conexión y actualizá la página.');return}let [p,v]=await Promise.all([sb.from('mia_products').select('*').order('sort_order'),loadAllVariants()]);if(p.error||v.error){msg('Error al cargar: '+(p.error||v.error).message);return}products=p.data||[];variants=v.data||[];renderProducts(entryModel);entryModel=null;restoreOrder();if(isAdmin)renderAdmin()}function renderProducts(sharedId=null){
  let q=el('search').value.toLowerCase(),a=el('audience').value;
  let found=products.filter(p=>p.active&&(!a||p.audience===a||p.audience==='Todos')&&[p.name,p.description,p.category].join(' ').toLowerCase().includes(q));
  const byProduct=new Map();
@@ -820,7 +846,7 @@ function editProduct(id){let p=products.find(x=>x.id===id);if(!p)return;for(cons
  <div class="model-line">${p.image_url?`<img class="model-img" src="${esc(p.image_url)}" loading="lazy" alt="">`:''}<div class="model-info"><strong>${esc(p.name)}</strong><div class="muted">Unidad ${fmt(p.price)}${Number(p.price_from_3)>0?` · Desde 3 ${fmt(p.price_from_3)}`:''} ${Number(p.price_dozen)>0?' · Docena '+fmt(p.price_dozen):''} · ${p.active?'Visible':'Oculto'} · ${p.sold_out?'Agotado':'Disponible'}</div></div><button class="light" onclick="editProduct('${p.id}')">Editar</button></div>
  <div class="model-actions" data-model="${esc(p.id)}"><button type="button" class="light" data-action="availability">${p.sold_out?'Volver a poner disponible':'Marcar como agotado'}</button><button type="button" class="danger" data-action="delete">Borrar artículo</button></div>
  <details><summary>Talles y colores</summary><div id="vars-${p.id}">${variants.filter(v=>v.product_id===p.id).map(v=>`<div class="row"><span>Talle ${esc(v.size)} · Color ${esc(v.color)}</span></div>`).join('')||'<p class="muted">Todavía sin talles y colores. Los clientes podrán consultarlos por WhatsApp.</p>'}</div>
- <div class="line" style="margin-top:10px"><input id="size-${p.id}" placeholder="Talle (ej. 38)"><input id="color-${p.id}" placeholder="Color"><button onclick="addVariant('${p.id}')">Agregar talle/color</button></div></details>
+ <div class="line" style="margin-top:10px"><input id="size-${p.id}" placeholder="Talles (ej. 38, 40 o 38 al 43)"><input id="color-${p.id}" placeholder="Color"><button onclick="addVariant('${p.id}')">Agregar talle/color</button></div></details>
  </div>`).join('')||(products.length?'<p>No se encontraron modelos con ese nombre.</p>':'<p>No hay productos cargados.</p>');
 }
 el('adminProducts').addEventListener('click',async event=>{
@@ -851,12 +877,14 @@ el('adminProducts').addEventListener('click',async event=>{
 async function addVariant(pid){
  const size=el('size-'+pid)?.value.trim(),color=el('color-'+pid)?.value.trim();
  if(!size||!color)return msg('Completá talle y color.');
- const exists=variants.some(v=>v.product_id===pid&&v.size.toLowerCase()===size.toLowerCase()&&v.color.toLowerCase()===color.toLowerCase());
- if(exists)return msg('Este talle y color ya están cargados.');
- // La columna stock permanece en la base por compatibilidad, pero no se utiliza.
- const r=await sb.from('mia_variants').insert({product_id:pid,size,color,stock:0});
- if(r.error)return msg('Error al guardar talle y color: '+r.error.message);
- await load();msg('Talle y color agregados');
+ const sizes=quickSizes(size);
+ if(!sizes.length)return msg('Ingresá al menos un talle.');
+ const existing=new Set(variants.filter(v=>String(v.product_id)===String(pid)&&v.color.toLowerCase()===color.toLowerCase()).map(v=>String(v.size).toLowerCase()));
+ const rows=sizes.filter(n=>!existing.has(n.toLowerCase())).map(n=>({product_id:pid,size:n,color,stock:0}));
+ if(!rows.length)return msg('Estos talles ya están cargados para ese color.');
+ const r=await sb.from('mia_variants').upsert(rows,{onConflict:'product_id,size,color',ignoreDuplicates:true});
+ if(r.error)return msg('Error al guardar talles: '+r.error.message);
+ await load();msg('Talles guardados para '+color+': '+rows.map(v=>v.size).join(', '));
 }
 // Carga rápida, adaptada del flujo de Mayorista Barato para calzado.
 let quickDrafts=[],quickCounter=0,quickOpened=false,quickBusy=false;
