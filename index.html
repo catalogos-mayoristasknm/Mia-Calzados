@@ -777,11 +777,10 @@ async function load(){if(!sb){msg('No se pudo conectar a Supabase. Revisá tu co
  const page=found.slice(shown,shown+12);
  grid.insertAdjacentHTML('beforeend',page.map(p=>{
   const promo=Number(p.price_from_3)>0 && Number(p.price_from_3)<Number(p.price);
-  const price=promo?Number(p.price_from_3):Number(p.price);
   const photo=p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : '<span class="no-photo">Foto pendiente</span>';
   return `<article class="card model-card" ${shared===p?'id="sharedCard" tabindex="-1"':''}>
    <button class="pair-cover" type="button" data-buy="${esc(p.id)}" aria-label="Ver ${esc(p.name)}">${photo}${p.sold_out?'<span class="model-badge">Agotado</span>':''}</button>
-   <div class="model-info"><h3>${esc(p.name)}</h3><p class="model-price">${promo?'<small>Desde </small>':''}${fmt(price)}</p><p class="model-condition">${promo?'El par · desde 3 pares surtidos':'Precio por par'}</p>
+   <div class="model-info"><h3>${esc(p.name)}</h3><p class="model-price">${fmt(p.price)} <small>el par</small></p><p class="model-condition">${promo?'Mayorista: '+fmt(p.price_from_3)+' por par · desde 3 pares surtidos':'Precio unitario'}</p>
    <button type="button" class="model-choose" data-buy="${esc(p.id)}">${p.sold_out?'Ver modelo':'Elegir opciones'}<span aria-hidden="true"> →</span></button>
    <button type="button" class="share-model" data-share="${esc(p.id)}">Compartir</button></div></article>`;
  }).join(''));
